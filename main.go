@@ -3,7 +3,9 @@ package main
 import (
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/handlers"
+	"finance-chatbot/api/kafka"
 	"finance-chatbot/api/middleware"
+	"finance-chatbot/api/mongodb"
 	"log"
 	"os"
 
@@ -42,22 +44,46 @@ func main() {
 		c.Next()
 	})
 
-	// Initialize database
-	db.InitDB()
-	// Authentication middleware
-	router.Use(middleware.AuthMiddleware)
+	// Initialize databases
+	if err := db.InitDB(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer db.CloseDB()
+
+	if err := mongodb.InitMongoDB(); err != nil {
+		log.Fatal("Failed to initialize MongoDB:", err)
+	}
+	defer mongodb.CloseMongoDB()
+
+	if err := kafka.InitProducer(); err != nil {
+		log.Fatal("Failed to initialize Kafka producer:", err)
+	}
+	defer kafka.MessageProducer.Close()
 
 	// API routes
 	api := router.Group("/api")
 	{
+		api.Use(middleware.AuthMiddleware)
 		// Plaid routes
 		api.POST("/plaid/create-link-token", handlers.CreateLinkToken)
 		api.POST("/plaid/exchange-token", handlers.ExchangePublicToken)
 		api.POST("/plaid/transactions", handlers.GetTransactions)
 		api.POST("/plaid/items", handlers.GetItems)
-
+		api.POST("/chat/new-chat", handlers.HandleCreateNewChat)
+		api.POST("/user-info/create", handlers.CreateUserInfo)
+		api.POST("/user-info/update", handlers.UpdateUserInfo)
+		api.POST("/user-info/delete", handlers.DeleteUserInfo)
+		api.POST("/user-info/get", handlers.GetUserInfo)
+		api.POST("/message/send", handlers.HandleSendMessage)
 		// WebSocket route
-		api.GET("/ws", handlers.HandleWebSocket)
+		api.GET("/ws/create", handlers.HandleCreateWebsocketConnection)
+		api.GET("/ws/close", handlers.HandleCloseWebsocketConnection)
+	}
+
+	internal := router.Group("/internal")
+	{
+		internal.Use(middleware.MicroserviceAuthMiddleware)
+		internal.POST("/message/receive", handlers.HandleReceiveMessage)
 	}
 
 	// Start server
@@ -70,4 +96,4 @@ func main() {
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
-} 
+}

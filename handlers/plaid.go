@@ -3,6 +3,7 @@ package handlers
 import (
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/middleware"
+	"finance-chatbot/api/models"
 	"net/http"
 	"time"
 
@@ -20,6 +21,10 @@ type CreateLinkTokenRequest struct {
 
 type ExchangeTokenRequest struct {
 	PublicToken string `json:"public_token" binding:"required"`
+}
+
+type GetTransactionsRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
 }
 
 func CreateLinkToken(c *gin.Context) {
@@ -126,12 +131,8 @@ func ExchangePublicToken(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": exchangeResponse.GetAccessToken(),
-		"item_id":     exchangeResponse.GetItemId(),
+		"item_id":      exchangeResponse.GetItemId(),
 	})
-}
-
-type GetTransactionsRequest struct {
-	AccessToken string `json:"access_token" binding:"required"`
 }
 
 func GetTransactions(c *gin.Context) {
@@ -157,25 +158,25 @@ func GetTransactions(c *gin.Context) {
 		return
 	}
 
-	transactions := result.GetTransactions()
+	plaidTransactions := result.GetTransactions()
 
 	// Format transactions for response
-	formattedTransactions := make([]map[string]interface{}, 0)
-	for _, t := range transactions {
-		transaction := map[string]interface{}{
-			"transaction_id": t.GetTransactionId(),
-			"date":          t.GetDate(),
-			"amount":        t.GetAmount(),
-			"name":          t.GetName(),
-			"merchant_name": t.GetMerchantName(),
-			"category":      t.GetCategory(),
-			"pending":       t.GetPending(),
+	transactions := make([]models.Transaction, 0)
+	for _, t := range plaidTransactions {
+		transaction := models.Transaction{
+			TransactionID: t.GetTransactionId(),
+			Date:          t.GetDate(),
+			Amount:        t.GetAmount(),
+			Name:          t.GetName(),
+			MerchantName:  t.GetMerchantName(),
+			Category:      t.GetCategory(),
+			Pending:       t.GetPending(),
 		}
-		formattedTransactions = append(formattedTransactions, transaction)
+		transactions = append(transactions, transaction)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"transactions": formattedTransactions,
+		"transactions": transactions,
 	})
 }
 
@@ -199,4 +200,3 @@ func GetItems(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
-

@@ -41,4 +41,4 @@ func CloseDB() {
 	if DB != nil {
 		DB.Close()
 	}
-} 
+}

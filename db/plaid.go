@@ -7,13 +7,13 @@ import (
 
 // PlaidItem represents a Plaid item in the database
 type PlaidItem struct {
-	ID            string
-	UserID        string
-	AccessToken   string
-	ItemID        string
-	Status        string
-	CreatedAt     sql.NullTime
-	UpdatedAt     sql.NullTime
+	ID          string
+	UserID      string
+	AccessToken string
+	ItemID      string
+	Status      string
+	CreatedAt   sql.NullTime
+	UpdatedAt   sql.NullTime
 }
 
 // CreatePlaidItem creates a new Plaid item in the database
@@ -132,4 +132,4 @@ func GetPlaidItemByItemID(itemID string) (*PlaidItem, error) {
 	}
 
 	return item, nil
-} 
+}

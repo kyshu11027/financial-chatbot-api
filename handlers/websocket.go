@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"finance-chatbot/api/middleware"
 	"log"
 	"net/http"
 	"time"
@@ -18,52 +18,74 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type Message struct {
-	Type    string          `json:"type"`
-	Content string          `json:"content"`
-	Data    json.RawMessage `json:"data,omitempty"`
-}
+const LLM_URL = "ws://localhost:8000/chat"
 
-func HandleWebSocket(c *gin.Context) {
+var Connections = make(map[string]*websocket.Conn)
+
+func HandleCreateWebsocketConnection(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade connection: %v", err)
 		return
 	}
-	defer conn.Close()
 
-	// Set read deadline to detect stale connections
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*middleware.SupabaseClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	log.Printf("WebSocket connection established from %s", c.Request.RemoteAddr)
+	Connections[claims.Sub] = conn
+
+	// Start a goroutine to monitor the connection
+	go monitorConnection(claims.Sub, conn)
+}
+
+func HandleCloseWebsocketConnection(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*middleware.SupabaseClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	Connections[claims.Sub].Close()
+	delete(Connections, claims.Sub)
+	c.JSON(http.StatusOK, gin.H{"message": "WebSocket connection closed"})
+}
+
+func monitorConnection(userID string, conn *websocket.Conn) {
+	defer func() {
+		conn.Close()
+		delete(Connections, userID)
+		log.Printf("Connection closed for user %s", userID)
+	}()
 
 	for {
-		var msg Message
-		err := conn.ReadJSON(&msg)
+		// Set a read deadline
+		err := conn.SetReadDeadline(time.Now().Add(60 * time.Second)) // Adjust the timeout as needed
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
-			}
-			// Send a close message before breaking
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			break
+			log.Printf("Error setting read deadline: %v", err)
+			return
 		}
 
-		// Reset read deadline after successful read
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-
-		// Here you would:
-		// 1. Forward the message to your Python microservice
-		// 2. Get the response
-		// 3. Send it back to the client
-
-		// For now, we'll just echo back a response
-		response := Message{
-			Type:    "response",
-			Content: "Received your message: " + msg.Content,
-		}
-
-		if err := conn.WriteJSON(response); err != nil {
-			log.Printf("Failed to write message: %v", err)
-			break
+		// Read message from the connection
+		_, _, err = conn.ReadMessage()
+		if err != nil {
+			log.Printf("Connection error for user %s: %v", userID, err)
+			return
 		}
 	}
-} 
+}
