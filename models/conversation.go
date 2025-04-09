@@ -13,4 +13,5 @@ type Message struct {
 	ConversationID string `json:"conversation_id" bson:"conversation_id"`
 	UserID         string `json:"user_id" bson:"user_id"`
 	Message        string `json:"message" bson:"message"`
+	Sender         string `json:"sender" bson:"sender"`
 }
