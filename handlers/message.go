@@ -9,18 +9,10 @@ import (
 	"finance-chatbot/api/mongodb"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
-
-type MessageRequest struct {
-	models.Message
-}
-
-type AIResponse struct {
-	models.Message
-}
 
 func HandleSendMessage(c *gin.Context) {
 
@@ -38,7 +30,7 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 
-	var req MessageRequest
+	var req models.Message
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Printf("Error binding JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -47,8 +39,9 @@ func HandleSendMessage(c *gin.Context) {
 	log.Printf("Received message request: %+v", req)
 	req.UserID = claims.Sub
 	req.Sender = "UserMessage"
-	
-	err := mongodb.CreateMessage(context.Background(), &req.Message)
+	req.Timestamp = time.Now().Unix()
+
+	err := mongodb.CreateMessage(context.Background(), &req)
 	if err != nil {
 		log.Printf("Failed to create message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
@@ -69,35 +62,6 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 	log.Println("Message sent successfully")
-	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully"})
-}
-
-func HandleReceiveMessage(c *gin.Context) {
-	var req AIResponse
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	conn := Connections[req.UserID]
-	if conn == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Connection not found"})
-		return
-	}
-
-	// Marshal the message to JSON
-	messageBytes, err := json.Marshal(req.Message)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal message"})
-		return
-	}
-
-	// Send the message over the WebSocket connection
-	err = conn.WriteMessage(websocket.TextMessage, messageBytes)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
-		return
-	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully"})
 }

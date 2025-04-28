@@ -1,6 +1,9 @@
 package kafka
 
 import (
+	"encoding/json"
+	"finance-chatbot/api/models"
+	"finance-chatbot/api/sse"
 	"log"
 	"os"
 
@@ -9,6 +12,8 @@ import (
 
 var MessageProducer *kafka.Producer
 var MessageTopic string = "user_message"
+var ResponseTopic string = "ai_response"
+var GroupID string = "ai-response-consumer"
 
 func InitProducer() error {
 	config := &kafka.ConfigMap{
@@ -39,5 +44,52 @@ func ProduceMessage(topic string, message []byte) error {
 		log.Printf("Failed to produce message: %s", err)
 		return err
 	}
+	return nil
+}
+
+func StartKafkaConsumer() error {
+	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers":  os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
+		"security.protocol":  "SASL_SSL",
+		"sasl.mechanisms":    "PLAIN",
+		"sasl.username":      os.Getenv("KAFKA_API_KEY"),
+		"sasl.password":      os.Getenv("KAFKA_API_SECRET"),
+		"session.timeout.ms": "45000",
+		"client.id":          "python-client-1",
+		"group.id":           GroupID,
+		"auto.offset.reset":  "latest",
+	})
+	if err != nil {
+		log.Fatalf("Failed to create consumer: %v", err)
+		return err
+	}
+
+	err = consumer.Subscribe(ResponseTopic, nil)
+	if err != nil {
+		log.Fatalf("Failed to subscribe to topic: %v", err)
+		return err
+	}
+
+	go func() {
+		for {
+			msg, err := consumer.ReadMessage(-1)
+			if err == nil {
+				// Log when a message is received
+				log.Printf("Received message from ai_response topic: %s", string(msg.Value))
+
+				// Assume the message key is requestID, value is the chunk
+				var aiResponse models.AIResponse
+				chunk := string(msg.Value)
+				if err := json.Unmarshal(msg.Value, &aiResponse); err != nil {
+					log.Printf("Failed to unmarshal message to AIResponse: %v", err)
+					continue
+				}
+				conversationID := aiResponse.ConversationID
+				sse.SendChunkToClient(conversationID, chunk)
+			} else {
+				log.Printf("Consumer error: %v", err)
+			}
+		}
+	}()
 	return nil
 }

@@ -14,4 +14,10 @@ type Message struct {
 	UserID         string `json:"user_id" bson:"user_id"`
 	Message        string `json:"message" bson:"message"`
 	Sender         string `json:"sender" bson:"sender"`
+	Timestamp      int64  `json:"timestamp" bson:"timestamp"`
+}
+
+type AIResponse struct {
+	Message
+	LastMessage bool `json:"last_message" bson:"last_message"`
 }

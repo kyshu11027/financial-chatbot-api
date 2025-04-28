@@ -60,6 +60,11 @@ func main() {
 	}
 	defer kafka.MessageProducer.Close()
 
+	err := kafka.StartKafkaConsumer()
+	if err != nil {
+		log.Fatal("Failed to start Kafka consumer:", err)
+	}
+
 	// API routes
 	api := router.Group("/api")
 	{
@@ -75,15 +80,7 @@ func main() {
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
 		api.POST("/message/send", handlers.HandleSendMessage)
-		// WebSocket route
-		api.GET("/ws/create", handlers.HandleCreateWebsocketConnection)
-		api.GET("/ws/close", handlers.HandleCloseWebsocketConnection)
-	}
-
-	internal := router.Group("/internal")
-	{
-		internal.Use(middleware.MicroserviceAuthMiddleware)
-		internal.POST("/message/receive", handlers.HandleReceiveMessage)
+		api.GET("/sse/:conversationID", handlers.HandleSSE)
 	}
 
 	// Start server

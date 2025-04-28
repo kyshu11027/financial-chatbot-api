@@ -31,8 +31,6 @@ func AuthMiddleware(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Received token: %s", tokenString)
-
 	// For development, we'll just verify the token structure and claims
 	claims := &SupabaseClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {

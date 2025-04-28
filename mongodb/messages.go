@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-
 func CreateMessage(ctx context.Context, message *models.Message) error {
 	collection := MongoClient.Database(MongoDatabase).Collection(MessageCollection)
 	_, err := collection.InsertOne(ctx, message)
