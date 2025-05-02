@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"finance-chatbot/api/db"
+	"finance-chatbot/api/llm"
 	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
@@ -14,6 +15,12 @@ import (
 )
 
 func HandleCreateNewChat(c *gin.Context) {
+
+	// TODO: User must pass through an initial message when creating a chat. Use models.Message.
+	// Send initial message -> create chat title -> save chat information to db -> pass message to llm service
+	// The backend will pass the message to the llm service asynchronously and return the chat information to the UI
+	// the UI will take the initial message and redirect to the chat ID URL and update the UI with the new conversation title
+	// the UI will then create a sse connection and wait for the message from the LLM service
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
@@ -26,14 +33,29 @@ func HandleCreateNewChat(c *gin.Context) {
 		return
 	}
 
-	conversationID, err := db.CreateConversation(claims.Sub)
+	var req models.NewChat
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	title, err := llm.GenerateChatTitle(req.Message)
+
+	if err != nil {
+		log.Printf("Error generating chat title: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	conversation, err := db.CreateConversation(claims.Sub, title)
 	if err != nil {
 		log.Printf("Error creating conversation for user %s: %v", claims.Sub, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	conversationContext, err := createConversationContext(c, claims.Sub, conversationID)
+	conversationContext, err := createConversationContext(c, claims.Sub, conversation.ID.String())
 	if err != nil {
 		log.Printf("Error creating conversation context for user %s: %v", claims.Sub, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -42,19 +64,24 @@ func HandleCreateNewChat(c *gin.Context) {
 
 	err = mongodb.CreateConversationContext(c, conversationContext)
 	if err != nil {
-		log.Printf("Error saving conversation context to MongoDB for conversation ID %s: %v", conversationID, err)
+		log.Printf("Error saving conversation context to MongoDB for conversation ID %s: %v", conversation.ID.String(), err)
 
-		err = db.DeleteConversation(conversationID)
+		err = db.DeleteConversation(conversation.ID.String())
 		if err != nil {
-			log.Printf("Error deleting conversation from DB for conversation ID %s: %v", conversationID, err)
+			log.Printf("Error deleting conversation from DB for conversation ID %s: %v", conversation.ID.String(), err)
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("Successfully created new chat for user %s with conversation ID %s", claims.Sub, conversationID)
-	c.JSON(http.StatusOK, gin.H{"conversation_id": conversationID, "conversation_context": conversationContext})
+	log.Printf("Successfully created new chat for user %s with conversation ID %s", claims.Sub, conversation.ID.String())
+	msg := &models.Message{
+		ConversationID: conversation.ID.String(),
+		Message: req.Message,
+	}
+	go processUserMessage(c, claims.Sub, msg)
+	c.JSON(http.StatusOK, gin.H{"conversation_id": conversation.ID.String(), "conversation_title": conversation.Title})
 }
 
 func createConversationContext(c *gin.Context, userID string, conversationID string) (*models.Context, error) {
@@ -80,7 +107,7 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		SavingsGoal:    userInfo.SavingsGoal,
 	}
 	log.Printf("Successfully created conversation context for userID: %s, conversationID: %s", userID, conversationID)
-
+	
 	return conversationContext, nil
 }
 

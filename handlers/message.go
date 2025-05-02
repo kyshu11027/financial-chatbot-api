@@ -7,6 +7,7 @@ import (
 	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -37,31 +38,36 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 	log.Printf("Received message request: %+v", req)
-	req.UserID = claims.Sub
-	req.Sender = "UserMessage"
-	req.Timestamp = time.Now().Unix()
-
-	err := mongodb.CreateMessage(context.Background(), &req)
+	err := processUserMessage(c, claims.Sub, &req)
 	if err != nil {
-		log.Printf("Failed to create message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
-		return
-	}
-
-	// Marshal the request and handle the error
-	messageBytes, err := json.Marshal(req)
-	if err != nil {
-		log.Printf("Failed to marshal message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal message"})
-		return
-	}
-	err = kafka.ProduceMessage(kafka.MessageTopic, messageBytes)
-	if err != nil {
-		log.Printf("Failed to produce message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to produce message"})
+		log.Printf("Error processing message: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	log.Println("Message sent successfully")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully"})
+}
+
+func processUserMessage(ctx context.Context, userId string, msg *models.Message) error {
+	msg.UserID = userId
+	msg.Sender = "UserMessage"
+	msg.Timestamp = time.Now().Unix()
+
+	err := mongodb.CreateMessage(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to create message: %w", err)
+	}
+
+	messageBytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	err = kafka.ProduceMessage(kafka.MessageTopic, messageBytes)
+	if err != nil {
+		return fmt.Errorf("failed to produce message: %w", err)
+	}
+
+	return nil
 }

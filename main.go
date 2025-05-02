@@ -74,7 +74,7 @@ func main() {
 		api.POST("/plaid/exchange-token", handlers.ExchangePublicToken)
 		api.POST("/plaid/transactions", handlers.GetTransactions)
 		api.POST("/plaid/items", handlers.GetItems)
-		api.POST("/chat/new-chat", handlers.HandleCreateNewChat)
+		api.POST("/chat/new", handlers.HandleCreateNewChat)
 		api.POST("/user-info/create", handlers.CreateUserInfo)
 		api.POST("/user-info/update", handlers.UpdateUserInfo)
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)

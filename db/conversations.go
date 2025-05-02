@@ -10,26 +10,28 @@ type Conversation struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
+	Title     string    `json:"title"`
 }
 
-func CreateConversation(userID string) (string, error) {
+func CreateConversation(userID string, title string) (*Conversation, error) {
 	query := `
-		INSERT INTO conversations (user_id)
-		VALUES ($1)
-		RETURNING id, user_id, created_at
+		INSERT INTO conversations (user_id, title)
+		VALUES ($1, $2)
+		RETURNING id, title, user_id, created_at
 	`
 	item := &Conversation{}
 
-	err := DB.QueryRow(query, userID).Scan(
+	err := DB.QueryRow(query, userID, title).Scan(
 		&item.ID,
+		&item.Title,
 		&item.UserID,
 		&item.CreatedAt,
 	)
 	if err != nil {
-		return "", err
+		return &Conversation{}, err
 	}
 
-	return item.ID.String(), nil
+	return item, nil
 }
 
 func DeleteConversation(id string) error {
