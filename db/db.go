@@ -14,9 +14,9 @@ var DB *sql.DB
 // InitDB initializes the database connection
 func InitDB() error {
 	// Get database connection string from environment variable
-	dbURL := os.Getenv("DATABASE_URL")
+	dbURL := os.Getenv("SUPABASE_URL")
 	if dbURL == "" {
-		return fmt.Errorf("DATABASE_URL environment variable not set")
+		return fmt.Errorf("SUPABASE_URL environment variable not set")
 	}
 
 	// Open database connection
