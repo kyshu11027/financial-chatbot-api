@@ -78,7 +78,7 @@ func HandleCreateNewChat(c *gin.Context) {
 	log.Printf("Successfully created new chat for user %s with conversation ID %s", claims.Sub, conversation.ID.String())
 	msg := &models.Message{
 		ConversationID: conversation.ID.String(),
-		Message: req.Message,
+		Text:        req.Message,
 	}
 	go processUserMessage(c, claims.Sub, msg)
 	c.JSON(http.StatusOK, gin.H{"conversation_id": conversation.ID.String(), "conversation_title": conversation.Title})
@@ -107,7 +107,7 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		SavingsGoal:    userInfo.SavingsGoal,
 	}
 	log.Printf("Successfully created conversation context for userID: %s, conversationID: %s", userID, conversationID)
-	
+
 	return conversationContext, nil
 }
 

@@ -49,7 +49,7 @@ func DeleteConversation(id string) error {
 
 func GetByID(id uuid.UUID) (*Conversation, error) {
 	query := `
-		SELECT id, user_id, created_at
+		SELECT id, user_id, created_at, title
 		FROM conversations
 		WHERE id = $1
 	`
@@ -58,6 +58,7 @@ func GetByID(id uuid.UUID) (*Conversation, error) {
 		&item.ID,
 		&item.UserID,
 		&item.CreatedAt,
+		&item.Title,
 	)
 	if err != nil {
 		return nil, err
@@ -81,7 +82,7 @@ func Delete(id uuid.UUID) error {
 
 func GetAllByUserID(userID string) ([]*Conversation, error) {
 	query := `
-		SELECT id, user_id, created_at
+		SELECT id, user_id, created_at, title
 		FROM conversations
 		WHERE user_id = $1
 	`
@@ -99,6 +100,7 @@ func GetAllByUserID(userID string) ([]*Conversation, error) {
 			&item.ID,
 			&item.UserID,
 			&item.CreatedAt,
+			&item.Title,
 		)
 		if err != nil {
 			return nil, err

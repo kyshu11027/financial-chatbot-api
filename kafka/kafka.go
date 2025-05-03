@@ -85,6 +85,7 @@ func StartKafkaConsumer() error {
 					continue
 				}
 				conversationID := aiResponse.ConversationID
+				log.Printf("Conversation ID: %s", conversationID)
 				sse.SendChunkToClient(conversationID, chunk)
 			} else {
 				log.Printf("Consumer error: %v", err)

@@ -32,8 +32,6 @@ func HandleSSE(c *gin.Context) {
 		sse.Mu.Lock()
 		delete(sse.SSEConnections, conversationID)
 		sse.Mu.Unlock()
-		close(messageChan)
-		close(doneChan)
 		log.Printf("SSE connection closed for conversationID: %s", conversationID)
 	}()
 
@@ -57,8 +55,10 @@ func HandleSSE(c *gin.Context) {
 			flusher.Flush()
 			return true
 		case <-c.Request.Context().Done():
+			log.Println("context done:", c.Request.Context().Err())
 			return false
 		case <-doneChan:
+			log.Printf("Done signal received for conversationID: %s", conversationID)
 			return false
 		}
 	})

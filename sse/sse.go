@@ -10,6 +10,7 @@ import (
 type ClientStream struct {
 	Messages chan string
 	Done     chan struct{}
+	CloseOnce sync.Once
 }
 
 var (
@@ -44,21 +45,19 @@ func SendChunkToClient(conversationID string, chunk string) {
 		}
 
 		// Signal completion
-		select {
-		case clientStream.Done <- struct{}{}:
-			log.Printf("Sent done signal to client for conversationID: %s", conversationID)
-		default:
-			log.Printf("Failed to send done signal: done channel is closed for conversationID: %s", conversationID)
-		}
+		clientStream.CloseOnce.Do(func() {
+			close(clientStream.Done)
+			close(clientStream.Messages)
+			log.Printf("Closed channels for conversationID: %s", conversationID)
+		})
 
-		// Cleanup - you can also close the message channel here if you are done with it
 		return
 	}
 
 	// Send regular messages
 	select {
-	case clientStream.Messages <- aiResponse.Message.Message:
-		log.Printf("Sent message: %s to client for conversationID: %s", aiResponse.Message.Message, conversationID)
+	case clientStream.Messages <- aiResponse.Text:
+		log.Printf("Sent message: %s to client for conversationID: %s", aiResponse.Text, conversationID)
 	default:
 		log.Printf("Failed to send message: message channel is closed for conversationID: %s", conversationID)
 	}

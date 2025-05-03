@@ -67,5 +67,5 @@ func GenerateChatTitle(userMessage string) (string, error) {
 	if len(openaiResp.Choices) > 0 {
 		return openaiResp.Choices[0].Message.Content, nil
 	}
-	return "Untitled Chat", nil
+	return "New Chat", nil
 }
