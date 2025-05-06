@@ -8,8 +8,8 @@ import (
 )
 
 type ClientStream struct {
-	Messages chan string
-	Done     chan struct{}
+	Messages  chan string
+	Done      chan struct{}
 	CloseOnce sync.Once
 }
 

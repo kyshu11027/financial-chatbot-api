@@ -11,6 +11,7 @@ import (
 )
 
 type CreateUserInfoRequest struct {
+	Name        string  `json:"name"`
 	Income      float64 `json:"income"`
 	SavingsGoal float64 `json:"savings_goal"`
 }
@@ -43,6 +44,7 @@ func CreateUserInfo(c *gin.Context) {
 
 	userInfo := &models.UserInfo{
 		UserID:      claims.Sub,
+		Name: 	  	 req.Name,
 		Income:      req.Income,
 		SavingsGoal: req.SavingsGoal,
 	}
@@ -82,6 +84,7 @@ func UpdateUserInfo(c *gin.Context) {
 
 	userInfo := &models.UserInfo{
 		UserID:      claims.Sub,
+		Name:        req.Name,
 		Income:      req.Income,
 		SavingsGoal: req.SavingsGoal,
 	}
@@ -142,6 +145,12 @@ func GetUserInfo(c *gin.Context) {
 	if err != nil {
 		log.Printf("Error retrieving user info for userID %s: %v", claims.Sub, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if userInfo == nil {
+		log.Printf("No user info found for userID: %s", claims.Sub)
+		c.JSON(http.StatusOK, gin.H{"no_user_info": true})
 		return
 	}
 
