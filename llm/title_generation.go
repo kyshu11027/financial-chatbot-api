@@ -35,7 +35,7 @@ func GenerateChatTitle(userMessage string) (string, error) {
 		Model:     "gpt-3.5-turbo",
 		MaxTokens: 20,
 		Messages: []Message{
-			{Role: "system", Content: "You are a helpful assistant that generates short, descriptive titles for financial advice chat conversations. Keep it under 5 words."},
+			{Role: "system", Content: "You are a helpful assistant that generates short, descriptive titles for financial advice chat conversations. Keep it under 5 words using only alphanumeric characters."},
 			{Role: "user", Content: fmt.Sprintf("Create a short title for this chat: %q", userMessage)},
 		},
 	}
