@@ -3,7 +3,6 @@ package handlers
 import (
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/llm"
-	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
 	"log"
@@ -27,7 +26,7 @@ func HandleCreateNewChat(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return

@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"finance-chatbot/api/db"
-	"finance-chatbot/api/middleware"
+	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
 	"log"
 	"net/http"
@@ -17,7 +17,7 @@ func HandleGetConversations(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return
@@ -43,7 +43,7 @@ func HandleGetMessagesByConversationID(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return

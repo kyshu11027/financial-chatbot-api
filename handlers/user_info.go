@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"finance-chatbot/api/db"
-	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/models"
 	"log"
 	"net/http"
@@ -35,7 +34,7 @@ func CreateUserInfo(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		log.Println("Invalid user claims in CreateUserInfo")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
@@ -68,7 +67,7 @@ func UpdateUserInfo(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		log.Println("Invalid user claims in UpdateUserInfo")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
@@ -108,7 +107,7 @@ func DeleteUserInfo(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		log.Println("Invalid user claims in DeleteUserInfo")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
@@ -134,7 +133,7 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		log.Println("Invalid user claims in GetUserInfo")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})

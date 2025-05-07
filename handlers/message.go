@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"finance-chatbot/api/kafka"
-	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
 	"fmt"
@@ -24,7 +23,7 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 
-	claims, ok := user.(*middleware.SupabaseClaims)
+	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
 		log.Println("Invalid user claims")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})

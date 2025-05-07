@@ -77,14 +77,14 @@ func main() {
 		api.POST("/chat/new", handlers.HandleCreateNewChat)
 		api.POST("/chat/conversations", handlers.HandleGetConversations)
 		api.POST("/chat/messages/get", handlers.HandleGetMessagesByConversationID)
-		api.POST("chat/messages/send", handlers.HandleSendMessage)
+		api.POST("/chat/messages/send", handlers.HandleSendMessage)
 		api.POST("/user-info/create", handlers.CreateUserInfo)
 		api.POST("/user-info/update", handlers.UpdateUserInfo)
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
-		api.GET("/sse/:conversationID", handlers.HandleSSE)
 	}
-
+	router.GET("/sse/:conversationID", handlers.HandleSSE)
+	
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

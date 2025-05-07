@@ -37,12 +37,6 @@ func SendChunkToClient(conversationID string, chunk string) {
 
 	// If this is the last message, ensure we send the final signal and close channels properly
 	if aiResponse.LastMessage {
-		select {
-		case clientStream.Messages <- "[DONE]":
-			log.Printf("Sent [DONE] message to client for conversationID: %s", conversationID)
-		default:
-			log.Printf("Failed to send [DONE] message: message channel is closed for conversationID: %s", conversationID)
-		}
 
 		// Signal completion
 		clientStream.CloseOnce.Do(func() {

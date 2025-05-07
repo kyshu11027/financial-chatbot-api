@@ -23,7 +23,7 @@ func GetMessagesByConversationID(ctx context.Context, userID string, conversatio
 	filter := bson.M{
 		"conversation_id": conversationID,
 	}
-	opts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}}).SetLimit(10)
+	opts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}})
 	
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {

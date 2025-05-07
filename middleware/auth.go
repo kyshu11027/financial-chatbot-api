@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"finance-chatbot/api/models"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,15 +13,6 @@ import (
 )
 
 // SupabaseClaims represents the claims in a Supabase JWT
-type SupabaseClaims struct {
-	jwt.RegisteredClaims
-	Email       string `json:"email"`
-	Sub         string `json:"sub"`
-	Role        string `json:"role"`
-	AppMetadata struct {
-		Provider string `json:"provider"`
-	} `json:"app_metadata"`
-}
 
 // AuthMiddleware verifies JWT tokens in requests
 func AuthMiddleware(c *gin.Context) {
@@ -31,8 +23,7 @@ func AuthMiddleware(c *gin.Context) {
 		return
 	}
 
-	// For development, we'll just verify the token structure and claims
-	claims := &SupabaseClaims{}
+	claims := &models.SupabaseClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		// Verify the signing method is HS256
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
