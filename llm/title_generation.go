@@ -73,7 +73,7 @@ func GenerateChatTitle(userMessage string) (string, error) {
 
 func cleanString(input string) string {
 	// Define regex pattern: keep only letters, digits, and spaces
-	re := regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+	re := regexp.MustCompile(`[^a-zA-Z0-9 ':,]+`)
 	cleaned := re.ReplaceAllString(input, "")
 	return cleaned
 }
