@@ -8,8 +8,8 @@ import (
 )
 
 type ClientStream struct {
-	Messages  chan string
-	Done      chan struct{}
+	Messages chan string
+	// Done      chan struct{}
 	CloseOnce sync.Once
 }
 
@@ -37,14 +37,7 @@ func SendChunkToClient(conversationID string, chunk string) {
 
 	// If this is the last message, ensure we send the final signal and close channels properly
 	if aiResponse.LastMessage {
-
-		// Signal completion
-		clientStream.CloseOnce.Do(func() {
-			close(clientStream.Done)
-			close(clientStream.Messages)
-			log.Printf("Closed channels for conversationID: %s", conversationID)
-		})
-
+		clientStream.Messages <- "[DONE]"
 		return
 	}
 

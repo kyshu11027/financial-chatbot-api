@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 )
 
@@ -65,7 +66,14 @@ func GenerateChatTitle(userMessage string) (string, error) {
 	}
 
 	if len(openaiResp.Choices) > 0 {
-		return openaiResp.Choices[0].Message.Content, nil
+		return cleanString(openaiResp.Choices[0].Message.Content), nil
 	}
 	return "New Chat", nil
+}
+
+func cleanString(input string) string {
+	// Define regex pattern: keep only letters, digits, and spaces
+	re := regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+	cleaned := re.ReplaceAllString(input, "")
+	return cleaned
 }

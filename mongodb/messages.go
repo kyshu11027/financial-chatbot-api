@@ -24,7 +24,7 @@ func GetMessagesByConversationID(ctx context.Context, userID string, conversatio
 		"conversation_id": conversationID,
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}})
-	
+
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching messages: %v", err)

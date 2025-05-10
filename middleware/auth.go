@@ -12,8 +12,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// SupabaseClaims represents the claims in a Supabase JWT
-
 // AuthMiddleware verifies JWT tokens in requests
 func AuthMiddleware(c *gin.Context) {
 	tokenString := extractToken(c.Request)

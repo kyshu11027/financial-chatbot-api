@@ -43,7 +43,7 @@ func CreateUserInfo(c *gin.Context) {
 
 	userInfo := &models.UserInfo{
 		UserID:      claims.Sub,
-		Name: 	  	 req.Name,
+		Name:        req.Name,
 		Income:      req.Income,
 		SavingsGoal: req.SavingsGoal,
 	}

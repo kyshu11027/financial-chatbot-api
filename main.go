@@ -70,21 +70,21 @@ func main() {
 	{
 		api.Use(middleware.AuthMiddleware)
 		// Plaid routes
-		api.POST("/plaid/create-link-token", handlers.CreateLinkToken)
-		api.POST("/plaid/exchange-token", handlers.ExchangePublicToken)
-		api.POST("/plaid/transactions", handlers.GetTransactions)
-		api.POST("/plaid/items", handlers.GetItems)
-		api.POST("/chat/new", handlers.HandleCreateNewChat)
-		api.POST("/chat/conversations", handlers.HandleGetConversations)
-		api.POST("/chat/messages/get", handlers.HandleGetMessagesByConversationID)
-		api.POST("/chat/messages/send", handlers.HandleSendMessage)
+		api.POST("/plaid/link-token/create", handlers.CreateLinkToken)
+		api.POST("/plaid/token/exchange", handlers.ExchangePublicToken)
+		api.POST("/plaid/transaction/list", handlers.GetTransactions)
+		api.POST("/plaid/item/list", handlers.GetItems)
+		api.POST("/chat/conversation/new", handlers.HandleCreateNewConversation)
+		api.POST("/chat/conversation/list", handlers.HandleGetConversations)
+		api.POST("/chat/message/list", handlers.HandleGetMessagesByConversationID)
+		api.POST("/chat/message/send", handlers.HandleSendMessage)
 		api.POST("/user-info/create", handlers.CreateUserInfo)
 		api.POST("/user-info/update", handlers.UpdateUserInfo)
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
 	}
 	router.GET("/sse/:conversationID", handlers.HandleSSE)
-	
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -22,7 +22,3 @@ type AIResponse struct {
 	Message
 	LastMessage bool `json:"last_message" bson:"last_message"`
 }
-
-type NewChat struct {
-	Message string `json:"message" bson:"message"`
-}

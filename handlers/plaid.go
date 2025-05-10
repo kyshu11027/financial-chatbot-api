@@ -135,6 +135,7 @@ func ExchangePublicToken(c *gin.Context) {
 		"item_id":      exchangeResponse.GetItemId(),
 	})
 }
+
 func GetTransactions(c *gin.Context) {
 	// Log the raw request body
 	bodyBytes, err := io.ReadAll(c.Request.Body)
@@ -198,8 +199,6 @@ func GetTransactions(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }
-
-
 
 func GetItems(c *gin.Context) {
 	user, exists := c.Get("user")

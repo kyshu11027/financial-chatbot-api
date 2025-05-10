@@ -1,82 +1,22 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"finance-chatbot/api/db"
-	"finance-chatbot/api/llm"
+	"finance-chatbot/api/kafka"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/plaid/plaid-go/plaid"
 )
-
-func HandleCreateNewChat(c *gin.Context) {
-
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	claims, ok := user.(*models.SupabaseClaims)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
-		return
-	}
-
-	var req models.NewChat
-	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("Error binding JSON: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	title, err := llm.GenerateChatTitle(req.Message)
-
-	if err != nil {
-		log.Printf("Error generating chat title: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	conversation, err := db.CreateConversation(claims.Sub, title)
-	if err != nil {
-		log.Printf("Error creating conversation for user %s: %v", claims.Sub, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	conversationContext, err := createConversationContext(c, claims.Sub, conversation.ID.String())
-	if err != nil {
-		log.Printf("Error creating conversation context for user %s: %v", claims.Sub, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	err = mongodb.CreateConversationContext(c, conversationContext)
-	if err != nil {
-		log.Printf("Error saving conversation context to MongoDB for conversation ID %s: %v", conversation.ID.String(), err)
-
-		err = db.DeleteConversation(conversation.ID.String())
-		if err != nil {
-			log.Printf("Error deleting conversation from DB for conversation ID %s: %v", conversation.ID.String(), err)
-		}
-
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	log.Printf("Successfully created new chat for user %s with conversation ID %s", claims.Sub, conversation.ID.String())
-	msg := &models.Message{
-		ConversationID: conversation.ID.String(),
-		Text:           req.Message,
-	}
-	c.JSON(http.StatusOK, gin.H{"conversation_id": conversation.ID.String(), "conversation_title": conversation.Title})
-	processUserMessage(c, claims.Sub, msg)
-}
 
 func createConversationContext(c *gin.Context, userID string, conversationID string) (*models.Context, error) {
 	log.Printf("Creating conversation context for userID: %s, conversationID: %s", userID, conversationID)
@@ -164,4 +104,71 @@ func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
 	}
 
 	return userInfo, nil
+}
+
+func processUserMessage(ctx context.Context, userId string, msg *models.Message) error {
+	msg.UserID = userId
+	msg.Sender = "UserMessage"
+	msg.Timestamp = time.Now().Unix()
+
+	err := mongodb.CreateMessage(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to create message: %w", err)
+	}
+
+	messageBytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	err = kafka.ProduceMessage(kafka.MessageTopic, messageBytes)
+	if err != nil {
+		return fmt.Errorf("failed to produce message: %w", err)
+	}
+
+	return nil
+}
+
+func authenticateSSE(c *gin.Context) error {
+	tokenString := c.DefaultQuery("token", "")
+	if tokenString == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
+		c.Abort()
+		return fmt.Errorf("missing or invalid token")
+	}
+
+	claims := &models.SupabaseClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		// Verify the signing method is HS256
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		// Use the JWT secret for verification
+		secret := os.Getenv("SUPABASE_JWT_SECRET")
+		if secret == "" {
+			return nil, fmt.Errorf("SUPABASE_JWT_SECRET environment variable not set")
+		}
+		return []byte(secret), nil
+	})
+
+	if err != nil {
+		log.Printf("Error parsing claims: %v", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
+		c.Abort()
+		return err
+	}
+
+	if !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		c.Abort()
+		return err
+	}
+
+	// Verify issuer
+	if claims.Issuer != os.Getenv("SUPABASE_URL")+"/auth/v1" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
+		c.Abort()
+		return err
+	}
+	return nil
 }
