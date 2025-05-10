@@ -62,6 +62,10 @@ func HandleGetMessagesByConversationID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	if len(messages) == 0 {
+		log.Printf("No messages found for conversation %s", req.ConversationID)
+		c.JSON(http.StatusOK, []models.Message{})
+		return
+	}
 	c.JSON(http.StatusOK, messages)
 }

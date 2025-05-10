@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/models"
+	"io"
 	"net/http"
 	"time"
 
@@ -133,33 +135,53 @@ func ExchangePublicToken(c *gin.Context) {
 		"item_id":      exchangeResponse.GetItemId(),
 	})
 }
-
 func GetTransactions(c *gin.Context) {
+	// Log the raw request body
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Printf("Failed to read request body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	log.Printf("Raw request body: %s", string(bodyBytes))
+
+	// Reassign body to allow binding (since ReadAll drains it)
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 	var req GetTransactionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("JSON binding error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("Parsed request: %+v", req)
 
-	// Get transactions from the last 30 days
+	// Set date range
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -200).Format("2006-01-02")
+	log.Printf("Fetching transactions from %s to %s", startDate, endDate)
 
+	// Create Plaid request
 	request := plaid.NewTransactionsGetRequest(
 		req.AccessToken,
 		startDate,
 		endDate,
 	)
+	log.Printf("Plaid request created: %+v", request)
 
-	result, _, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
+	// Call Plaid API
+	result, httpResp, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
 	if err != nil {
+		body, _ := io.ReadAll(httpResp.Body)
+		log.Printf("Plaid API error: %v\nResponse body: %s", err, string(body))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Format and return transactions
 	plaidTransactions := result.GetTransactions()
+	log.Printf("Fetched %d transactions", len(plaidTransactions))
 
-	// Format transactions for response
 	transactions := make([]models.Transaction, 0)
 	for _, t := range plaidTransactions {
 		transaction := models.Transaction{
@@ -174,10 +196,10 @@ func GetTransactions(c *gin.Context) {
 		transactions = append(transactions, transaction)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"transactions": transactions,
-	})
+	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }
+
+
 
 func GetItems(c *gin.Context) {
 	user, exists := c.Get("user")

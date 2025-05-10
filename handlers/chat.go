@@ -15,11 +15,6 @@ import (
 
 func HandleCreateNewChat(c *gin.Context) {
 
-	// TODO: User must pass through an initial message when creating a chat. Use models.Message.
-	// Send initial message -> create chat title -> save chat information to db -> pass message to llm service
-	// The backend will pass the message to the llm service asynchronously and return the chat information to the UI
-	// the UI will take the initial message and redirect to the chat ID URL and update the UI with the new conversation title
-	// the UI will then create a sse connection and wait for the message from the LLM service
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
@@ -79,8 +74,8 @@ func HandleCreateNewChat(c *gin.Context) {
 		ConversationID: conversation.ID.String(),
 		Text:           req.Message,
 	}
-	go processUserMessage(c, claims.Sub, msg)
 	c.JSON(http.StatusOK, gin.H{"conversation_id": conversation.ID.String(), "conversation_title": conversation.Title})
+	processUserMessage(c, claims.Sub, msg)
 }
 
 func createConversationContext(c *gin.Context, userID string, conversationID string) (*models.Context, error) {
