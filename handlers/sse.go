@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"finance-chatbot/api/sse"
 	"fmt"
 	"io"
@@ -9,6 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type SSEMessage struct {
+	Message string `json:"message"`
+}
 
 func HandleSSE(c *gin.Context) {
 	if err := authenticateSSE(c); err != nil {
@@ -58,15 +63,18 @@ func HandleSSE(c *gin.Context) {
 			if !ok {
 				return false
 			}
-			c.Writer.Write([]byte("data: " + msg + "\n\n"))
+			payload, err := json.Marshal(SSEMessage{Message: msg})
+			if err != nil {
+				log.Println("failed to marshal SSE message:", err)
+				return false
+			}
+
+			c.Writer.Write([]byte("data: " + string(payload) + "\n\n"))
 			flusher.Flush()
 			return true
 		case <-c.Request.Context().Done():
 			log.Println("context done:", c.Request.Context().Err())
 			return false
-			// case <-doneChan:
-			// 	log.Printf("Done signal received for conversationID: %s", conversationID)
-			// 	return false
 		}
 	})
 }

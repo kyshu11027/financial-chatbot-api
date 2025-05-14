@@ -36,6 +36,11 @@ func SendChunkToClient(conversationID string, chunk string) {
 	log.Printf("AIChunk: %v, LastMessage: %v", aiResponse.Message, aiResponse.LastMessage)
 
 	// If this is the last message, ensure we send the final signal and close channels properly
+	if aiResponse.LastMessage && aiResponse.Error {
+		clientStream.Messages <- "[ERROR]"
+		return
+	}
+
 	if aiResponse.LastMessage {
 		clientStream.Messages <- "[DONE]"
 		return

@@ -15,6 +15,7 @@ type Message struct {
 	UserID         string `json:"user_id" bson:"user_id"`
 	Text           string `json:"message" bson:"message"`
 	Sender         string `json:"sender" bson:"sender"`
+	Error          bool   `json:"error" bson:"error"`
 	Timestamp      int64  `json:"timestamp" bson:"timestamp"`
 }
 

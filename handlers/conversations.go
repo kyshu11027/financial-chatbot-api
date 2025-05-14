@@ -12,7 +12,7 @@ import (
 )
 
 type NewConversationRequest struct {
-	Message        string `json:"message" bson:"message"`
+	Message string `json:"message" bson:"message"`
 }
 
 func HandleCreateNewConversation(c *gin.Context) {
