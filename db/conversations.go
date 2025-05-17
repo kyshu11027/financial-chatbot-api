@@ -47,7 +47,7 @@ func DeleteConversation(id string) error {
 	return nil
 }
 
-func GetByID(id uuid.UUID) (*Conversation, error) {
+func GetByID(id string) (*Conversation, error) {
 	query := `
 		SELECT id, user_id, created_at, title
 		FROM conversations
@@ -67,7 +67,7 @@ func GetByID(id uuid.UUID) (*Conversation, error) {
 	return item, nil
 }
 
-func Delete(id uuid.UUID) error {
+func Delete(id string) error {
 	query := `
 		DELETE FROM conversations
 		WHERE id = $1
@@ -109,4 +109,26 @@ func GetAllByUserID(userID string) ([]*Conversation, error) {
 	}
 
 	return items, nil
+}
+
+func Update(id string, title string) (*Conversation, error) {
+	query := `
+		UPDATE conversations
+		SET title = $1
+		WHERE id = $2
+		RETURNING id, user_id, created_at, title
+	`
+
+	item := &Conversation{}
+	err := DB.QueryRow(query, title, id).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.CreatedAt,
+		&item.Title,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return item, nil
 }

@@ -15,6 +15,15 @@ type NewConversationRequest struct {
 	Message string `json:"message" bson:"message"`
 }
 
+type UpdateConversationTitleRequest struct {
+	ConversationID string `json:"conversation_id" bson:"conversation_id"`
+	Title string `json:"title" bson:"title"`
+}
+
+type DeleteConversationRequest struct {
+	ConversationID string `json:"conversation_id" bson:"conversation_id"`
+}
+
 func HandleCreateNewConversation(c *gin.Context) {
 
 	user, exists := c.Get("user")
@@ -101,4 +110,115 @@ func HandleGetConversations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, conversations)
+}
+
+func HandleUpdateConversation(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	var req UpdateConversationTitleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON for title update: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.ConversationID == "" || req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id and title are required"})
+		return
+	}
+
+	// Fetch conversation to check ownership
+	conversation, err := db.GetByID(req.ConversationID)
+	if err != nil {
+		log.Printf("Error fetching conversation: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	if conversation.UserID != claims.Sub {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to update this conversation"})
+		return
+	}
+
+	updatedConversation, err := db.Update(req.ConversationID, req.Title)
+	if err != nil {
+		log.Printf("Error updating conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedConversation)
+}
+
+func HandleDeleteConversation(c *gin.Context) {
+user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	var req DeleteConversationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON for title update: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.ConversationID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id and title are required"})
+		return
+	}
+
+	// Fetch conversation to check ownership
+	conversation, err := db.GetByID(req.ConversationID)
+	if err != nil {
+		log.Printf("Error fetching conversation: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	if conversation.UserID != claims.Sub {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to update this conversation"})
+		return
+	}
+
+	err = db.Delete(req.ConversationID)
+	if err != nil {
+		log.Printf("Error deleting conversation from Postgres: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = mongodb.DeleteConversation(c, req.ConversationID)
+
+	if err != nil {
+		log.Printf("Error deleting conversation context from MongoDB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = mongodb.DeleteMessages(c, req.ConversationID)
+	if err != nil {
+		log.Printf("Error deleting conversation messages from MongoDB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, map[string]any{"success": true})
 }

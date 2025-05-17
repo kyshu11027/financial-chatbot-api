@@ -34,7 +34,7 @@ func UpdateConversationContext(ctx context.Context, conversationID string, updat
 func DeleteConversation(ctx context.Context, conversationID string) error {
 	collection := MongoClient.Database(MongoDatabase).Collection(ContextCollection)
 
-	_, err := collection.DeleteMany(ctx, map[string]interface{}{"conversation_id": conversationID})
+	_, err := collection.DeleteMany(ctx, map[string]any{"conversation_id": conversationID})
 	if err != nil {
 		return fmt.Errorf("error deleting mongo items: %v", err)
 	}

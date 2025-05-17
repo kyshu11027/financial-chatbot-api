@@ -76,6 +76,8 @@ func main() {
 		api.POST("/plaid/item/list", handlers.GetItems)
 		api.POST("/chat/conversation/new", handlers.HandleCreateNewConversation)
 		api.POST("/chat/conversation/list", handlers.HandleGetConversations)
+		api.POST("/chat/conversation/update", handlers.HandleUpdateConversation)
+		api.POST("/chat/conversation/delete", handlers.HandleDeleteConversation)
 		api.POST("/chat/message/list", handlers.HandleGetMessagesByConversationID)
 		api.POST("/chat/message/send", handlers.HandleSendMessage)
 		api.POST("/user-info/create", handlers.CreateUserInfo)
