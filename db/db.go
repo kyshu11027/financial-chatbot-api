@@ -2,8 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"finance-chatbot/api/logger"
 	"fmt"
-	"log"
 	"os"
 
 	_ "github.com/lib/pq"
@@ -32,7 +32,7 @@ func InitDB() error {
 		return fmt.Errorf("error connecting to the database: %v", err)
 	}
 
-	log.Println("Successfully connected to Supabase database")
+	logger.Get().Info("Successfully connected to Supabase database")
 	return nil
 }
 

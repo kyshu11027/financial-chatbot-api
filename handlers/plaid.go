@@ -3,18 +3,20 @@ package handlers
 import (
 	"bytes"
 	"finance-chatbot/api/db"
+	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
 	"io"
 	"net/http"
 	"time"
 
-	"log"
-
 	"github.com/gin-gonic/gin"
 	"github.com/plaid/plaid-go/plaid"
+	"go.uber.org/zap"
 )
 
-var PlaidClient *plaid.APIClient
+var (
+	PlaidClient *plaid.APIClient
+)
 
 type CreateLinkTokenRequest struct {
 	UserID string `json:"user_id" binding:"required"`
@@ -31,6 +33,7 @@ type GetTransactionsRequest struct {
 func CreateLinkToken(c *gin.Context) {
 	var req CreateLinkTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Get().Error("error binding JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -45,44 +48,50 @@ func CreateLinkToken(c *gin.Context) {
 	)
 	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
 
-	// Log the request details
-	log.Printf("Creating link token for user: %s", req.UserID)
-	log.Printf("Request: %+v", linkTokenRequest)
+	logger.Get().Info("creating link token",
+		zap.String("user_id", req.UserID),
+		zap.Any("request", linkTokenRequest))
 
 	linkToken, _, err := PlaidClient.PlaidApi.LinkTokenCreate(c.Request.Context()).LinkTokenCreateRequest(*linkTokenRequest).Execute()
 	if err != nil {
 		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
-			log.Printf("Plaid error: %s", string(plaidErr.Body()))
+			logger.Get().Error("plaid error",
+				zap.String("error_body", string(plaidErr.Body())),
+				zap.Error(plaidErr))
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": plaidErr.Error(),
 				"body":  string(plaidErr.Body()),
 			})
 		} else {
-			log.Printf("Error creating link token: %v", err)
+			logger.Get().Error("error creating link token", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		return
 	}
 
+	logger.Get().Info("link token created successfully",
+		zap.String("user_id", req.UserID))
 	c.JSON(http.StatusOK, gin.H{"link_token": linkToken.GetLinkToken()})
 }
 
 func ExchangePublicToken(c *gin.Context) {
 	var req ExchangeTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Get().Error("error binding JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Get user ID from context (set by auth middleware)
 	user, exists := c.Get("user")
 	if !exists {
+		logger.Get().Error("user not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
 	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
+		logger.Get().Error("invalid user claims")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return
 	}
@@ -91,43 +100,57 @@ func ExchangePublicToken(c *gin.Context) {
 	exchangeResponse, _, err := PlaidClient.PlaidApi.ItemPublicTokenExchange(c.Request.Context()).ItemPublicTokenExchangeRequest(*exchangeRequest).Execute()
 	if err != nil {
 		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
-			log.Printf("Plaid error: %s", string(plaidErr.Body()))
+			logger.Get().Error("plaid error",
+				zap.String("error_body", string(plaidErr.Body())),
+				zap.Error(plaidErr))
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": plaidErr.Error(),
 				"body":  string(plaidErr.Body()),
 			})
 		} else {
-			log.Printf("Error exchanging public token: %v", err)
+			logger.Get().Error("error exchanging public token", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		return
 	}
 
-	// Check if item already exists
 	existingItem, err := db.GetPlaidItemByItemID(exchangeResponse.GetItemId())
 	if err != nil {
+		logger.Get().Error("error checking existing item",
+			zap.String("item_id", exchangeResponse.GetItemId()),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	if existingItem != nil {
-		// Update existing item
 		err = db.UpdatePlaidItemStatus(existingItem.ItemID, "active")
 		if err != nil {
+			logger.Get().Error("error updating existing item",
+				zap.String("item_id", existingItem.ItemID),
+				zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update existing item"})
 			return
 		}
+		logger.Get().Info("updated existing plaid item",
+			zap.String("item_id", existingItem.ItemID),
+			zap.String("user_id", claims.Sub))
 	} else {
-		// Create new item
 		_, err = db.CreatePlaidItem(
 			claims.Sub,
 			exchangeResponse.GetAccessToken(),
 			exchangeResponse.GetItemId(),
 		)
 		if err != nil {
+			logger.Get().Error("error creating new plaid item",
+				zap.String("user_id", claims.Sub),
+				zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		logger.Get().Info("created new plaid item",
+			zap.String("item_id", exchangeResponse.GetItemId()),
+			zap.String("user_id", claims.Sub))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -137,51 +160,48 @@ func ExchangePublicToken(c *gin.Context) {
 }
 
 func GetTransactions(c *gin.Context) {
-	// Log the raw request body
 	bodyBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		log.Printf("Failed to read request body: %v", err)
+		logger.Get().Error("failed to read request body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	log.Printf("Raw request body: %s", string(bodyBytes))
+	logger.Get().Debug("raw request body", zap.String("body", string(bodyBytes)))
 
-	// Reassign body to allow binding (since ReadAll drains it)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	var req GetTransactionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("JSON binding error: %v", err)
+		logger.Get().Error("error binding JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("Parsed request: %+v", req)
 
-	// Set date range
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -200).Format("2006-01-02")
-	log.Printf("Fetching transactions from %s to %s", startDate, endDate)
+	logger.Get().Info("fetching transactions",
+		zap.String("start_date", startDate),
+		zap.String("end_date", endDate))
 
-	// Create Plaid request
 	request := plaid.NewTransactionsGetRequest(
 		req.AccessToken,
 		startDate,
 		endDate,
 	)
-	log.Printf("Plaid request created: %+v", request)
 
-	// Call Plaid API
 	result, httpResp, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
 	if err != nil {
 		body, _ := io.ReadAll(httpResp.Body)
-		log.Printf("Plaid API error: %v\nResponse body: %s", err, string(body))
+		logger.Get().Error("plaid API error",
+			zap.String("response_body", string(body)),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Format and return transactions
 	plaidTransactions := result.GetTransactions()
-	log.Printf("Fetched %d transactions", len(plaidTransactions))
+	logger.Get().Info("fetched transactions",
+		zap.Int("count", len(plaidTransactions)))
 
 	transactions := make([]models.Transaction, 0)
 	for _, t := range plaidTransactions {
@@ -203,20 +223,29 @@ func GetTransactions(c *gin.Context) {
 func GetItems(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
+		logger.Get().Error("user not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
 	claims, ok := user.(*models.SupabaseClaims)
 	if !ok {
+		logger.Get().Error("invalid user claims")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return
 	}
 
 	items, err := db.GetPlaidItemsByUserID(claims.Sub)
 	if err != nil {
+		logger.Get().Error("error fetching plaid items",
+			zap.String("user_id", claims.Sub),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	logger.Get().Info("fetched plaid items",
+		zap.String("user_id", claims.Sub),
+		zap.Int("item_count", len(items)))
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }

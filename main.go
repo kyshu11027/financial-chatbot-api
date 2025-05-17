@@ -4,20 +4,32 @@ import (
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/handlers"
 	"finance-chatbot/api/kafka"
+	"finance-chatbot/api/logger"
 	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/mongodb"
-	"log"
+	"flag"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/plaid/plaid-go/plaid"
+	"go.uber.org/zap"
 )
 
 func init() {
-	// Load environment variables
+	// Define command line flags
+	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+	flag.Parse()
+
+	// Initialize logger first
+	if err := logger.Init(os.Getenv("ENV") == "development", logger.LogLevel(*logLevel)); err != nil {
+		panic("failed to initialize logger: " + err.Error())
+	}
+	defer logger.Sync()
+
+	// Load environment variables after logger is initialized
 	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: .env file not found")
+		logger.Get().Error("Warning: .env file not found")
 	}
 
 	// Initialize Plaid client
@@ -46,23 +58,23 @@ func main() {
 
 	// Initialize databases
 	if err := db.InitDB(); err != nil {
-		log.Fatal("Failed to initialize database:", err)
+		logger.Get().Fatal("Failed to initialize database", zap.Error(err))
 	}
 	defer db.CloseDB()
 
 	if err := mongodb.InitMongoDB(); err != nil {
-		log.Fatal("Failed to initialize MongoDB:", err)
+		logger.Get().Fatal("Failed to initialize MongoDB", zap.Error(err))
 	}
 	defer mongodb.CloseMongoDB()
 
 	if err := kafka.InitProducer(); err != nil {
-		log.Fatal("Failed to initialize Kafka producer:", err)
+		logger.Get().Fatal("Failed to initialize Kafka producer", zap.Error(err))
 	}
 	defer kafka.MessageProducer.Close()
 
 	err := kafka.StartKafkaConsumer()
 	if err != nil {
-		log.Fatal("Failed to start Kafka consumer:", err)
+		logger.Get().Fatal("Failed to start Kafka consumer", zap.Error(err))
 	}
 
 	// API routes
@@ -93,8 +105,8 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Server starting on port %s", port)
+	logger.Get().Info("Server starting", zap.String("port", port))
 	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
+		logger.Get().Fatal("Failed to start server", zap.Error(err))
 	}
 }

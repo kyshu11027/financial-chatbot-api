@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"finance-chatbot/api/logger"
 	"finance-chatbot/api/sse"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type SSEMessage struct {
@@ -17,7 +18,7 @@ type SSEMessage struct {
 
 func HandleSSE(c *gin.Context) {
 	if err := authenticateSSE(c); err != nil {
-		log.Printf("Authentication failed: %v", err)
+		logger.Get().Error("authentication failed", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Unauthorized: %v", err)})
 		return
 	}
@@ -36,19 +37,23 @@ func HandleSSE(c *gin.Context) {
 	sse.SSEConnections[conversationID] = clientStream
 	sse.Mu.Unlock()
 
-	log.Printf("SSE connection established for conversationID: %s", conversationID)
+	logger.Get().Info("SSE connection established",
+		zap.String("conversation_id", conversationID))
 
 	// Automatically remove connection when client disconnects
 	defer func() {
-		log.Printf("Closing SSE connection for conversationID: %s", conversationID)
+		logger.Get().Info("closing SSE connection",
+			zap.String("conversation_id", conversationID))
 		sse.Mu.Lock()
 		delete(sse.SSEConnections, conversationID)
 		sse.Mu.Unlock()
-		log.Printf("SSE connection closed for conversationID: %s", conversationID)
+		logger.Get().Info("SSE connection closed",
+			zap.String("conversation_id", conversationID))
 	}()
 
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
+		logger.Get().Error("streaming not supported")
 		c.String(http.StatusInternalServerError, "Streaming unsupported!")
 		return
 	}
@@ -65,7 +70,9 @@ func HandleSSE(c *gin.Context) {
 			}
 			payload, err := json.Marshal(SSEMessage{Message: msg})
 			if err != nil {
-				log.Println("failed to marshal SSE message:", err)
+				logger.Get().Error("failed to marshal SSE message",
+					zap.Error(err),
+					zap.String("message", msg))
 				return false
 			}
 
@@ -73,7 +80,9 @@ func HandleSSE(c *gin.Context) {
 			flusher.Flush()
 			return true
 		case <-c.Request.Context().Done():
-			log.Println("context done:", c.Request.Context().Err())
+			logger.Get().Info("SSE context done",
+				zap.String("conversation_id", conversationID),
+				zap.Error(c.Request.Context().Err()))
 			return false
 		}
 	})

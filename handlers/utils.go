@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/kafka"
+	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -16,19 +16,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/plaid/plaid-go/plaid"
+	"go.uber.org/zap"
 )
 
 func createConversationContext(c *gin.Context, userID string, conversationID string) (*models.Context, error) {
-	log.Printf("Creating conversation context for userID: %s, conversationID: %s", userID, conversationID)
+	logger.Get().Info("creating conversation context",
+		zap.String("user_id", userID),
+		zap.String("conversation_id", conversationID))
+
 	transactions, err := getTransactions(c, userID)
 	if err != nil {
-		log.Printf("Error getting transactions for userID %s: %v", userID, err)
+		logger.Get().Error("error getting transactions",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
 	userInfo, err := getUserInfo(c, userID)
 	if err != nil {
-		log.Printf("Error getting user info for userID %s: %v", userID, err)
+		logger.Get().Error("error getting user info",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
@@ -41,27 +49,38 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		SavingsGoal:    userInfo.SavingsGoal,
 		Name:           userInfo.Name,
 	}
-	log.Printf("Successfully created conversation context for userID: %s, conversationID: %s", userID, conversationID)
 
+	logger.Get().Info("conversation context created successfully",
+		zap.String("user_id", userID),
+		zap.String("conversation_id", conversationID))
 	return conversationContext, nil
 }
 
 func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error) {
-	log.Printf("Fetching plaid items for userID: %s", userID)
+	logger.Get().Info("fetching plaid items",
+		zap.String("user_id", userID))
+
 	plaidItems, err := db.GetPlaidItemsByUserID(userID)
 	if err != nil {
-		log.Printf("Error fetching plaid items for userID %s: %v", userID, err)
+		logger.Get().Error("error fetching plaid items",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
-	// Get transactions from the last 180 days
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -180).Format("2006-01-02")
 	transactions := []models.Transaction{}
-	log.Printf("Fetching transactions from %s to %s for userID: %s", startDate, endDate, userID)
+
+	logger.Get().Info("fetching transactions",
+		zap.String("user_id", userID),
+		zap.String("start_date", startDate),
+		zap.String("end_date", endDate))
 
 	for _, plaidItem := range plaidItems {
-		log.Printf("Fetching transactions for plaid item with access token: %s", plaidItem.AccessToken)
+		logger.Get().Debug("fetching transactions for plaid item",
+			zap.String("access_token", plaidItem.AccessToken))
+
 		request := plaid.NewTransactionsGetRequest(
 			plaidItem.AccessToken,
 			startDate,
@@ -70,14 +89,18 @@ func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error
 
 		result, _, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
 		if err != nil {
-			log.Printf("Error fetching transactions for plaid item with access token %s: %v", plaidItem.AccessToken, err)
+			logger.Get().Error("error fetching transactions for plaid item",
+				zap.String("access_token", plaidItem.AccessToken),
+				zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return nil, err
 		}
-		plaidTransactions := result.GetTransactions()
-		log.Printf("Successfully fetched %d transactions for plaid item with access token: %s", len(plaidTransactions), plaidItem.AccessToken)
 
-		// Format transactions for response
+		plaidTransactions := result.GetTransactions()
+		logger.Get().Info("transactions fetched successfully",
+			zap.String("access_token", plaidItem.AccessToken),
+			zap.Int("transaction_count", len(plaidTransactions)))
+
 		for _, t := range plaidTransactions {
 			transaction := models.Transaction{
 				TransactionID: t.GetTransactionId(),
@@ -92,14 +115,18 @@ func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error
 		}
 	}
 
-	log.Printf("Successfully retrieved %d transactions for userID: %s", len(transactions), userID)
+	logger.Get().Info("all transactions retrieved successfully",
+		zap.String("user_id", userID),
+		zap.Int("total_transactions", len(transactions)))
 	return transactions, nil
 }
 
 func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
 	userInfo, err := db.GetUserInfo(c, userID)
 	if err != nil {
-		log.Printf("Error fetching user info for userID %s: %v", userID, err)
+		logger.Get().Error("error fetching user info",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
@@ -113,16 +140,25 @@ func processUserMessage(ctx context.Context, userId string, msg *models.Message)
 
 	err := mongodb.CreateMessage(ctx, msg)
 	if err != nil {
+		logger.Get().Error("failed to create message",
+			zap.String("user_id", userId),
+			zap.Error(err))
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 
 	messageBytes, err := json.Marshal(msg)
 	if err != nil {
+		logger.Get().Error("failed to marshal message",
+			zap.String("user_id", userId),
+			zap.Error(err))
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
 	err = kafka.ProduceMessage(kafka.MessageTopic, messageBytes)
 	if err != nil {
+		logger.Get().Error("failed to produce message",
+			zap.String("user_id", userId),
+			zap.Error(err))
 		return fmt.Errorf("failed to produce message: %w", err)
 	}
 
@@ -132,6 +168,7 @@ func processUserMessage(ctx context.Context, userId string, msg *models.Message)
 func authenticateSSE(c *gin.Context) error {
 	tokenString := c.DefaultQuery("token", "")
 	if tokenString == "" {
+		logger.Get().Error("missing or invalid token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
 		c.Abort()
 		return fmt.Errorf("missing or invalid token")
@@ -139,11 +176,9 @@ func authenticateSSE(c *gin.Context) error {
 
 	claims := &models.SupabaseClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		// Verify the signing method is HS256
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		// Use the JWT secret for verification
 		secret := os.Getenv("SUPABASE_JWT_SECRET")
 		if secret == "" {
 			return nil, fmt.Errorf("SUPABASE_JWT_SECRET environment variable not set")
@@ -152,20 +187,22 @@ func authenticateSSE(c *gin.Context) error {
 	})
 
 	if err != nil {
-		log.Printf("Error parsing claims: %v", err)
+		logger.Get().Error("error parsing claims", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
 		c.Abort()
 		return err
 	}
 
 	if !token.Valid {
+		logger.Get().Error("invalid token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		c.Abort()
 		return err
 	}
 
-	// Verify issuer
 	if claims.Issuer != os.Getenv("SUPABASE_URL")+"/auth/v1" {
+		logger.Get().Error("invalid token issuer",
+			zap.String("issuer", claims.Issuer))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
 		c.Abort()
 		return err
