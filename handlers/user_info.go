@@ -1,27 +1,18 @@
 package handlers
 
 import (
-	"finance-chatbot/api/db"
 	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
+	"finance-chatbot/api/mongodb"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
-type CreateUserInfoRequest struct {
-	Name        string  `json:"name"`
-	Income      float64 `json:"income"`
-	SavingsGoal float64 `json:"savings_goal"`
-}
-
-type UpdateUserInfoRequest struct {
-	CreateUserInfoRequest
-}
-
 func CreateUserInfo(c *gin.Context) {
-	var req CreateUserInfoRequest
+	var req models.UserInfo
 	if err := c.ShouldBindJSON(&req); err != nil {
 		logger.Get().Error("error binding JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -42,14 +33,10 @@ func CreateUserInfo(c *gin.Context) {
 		return
 	}
 
-	userInfo := &models.UserInfo{
-		UserID:      claims.Sub,
-		Name:        req.Name,
-		Income:      req.Income,
-		SavingsGoal: req.SavingsGoal,
-	}
+	req.UserID = claims.Sub
+	req.CreatedAt = time.Now().Unix()
 
-	err := db.CreateUserInfo(c, userInfo)
+	err := mongodb.CreateUserInfo(c, &req)
 	if err != nil {
 		logger.Get().Error("error creating user info",
 			zap.String("user_id", claims.Sub),
@@ -78,21 +65,16 @@ func UpdateUserInfo(c *gin.Context) {
 		return
 	}
 
-	var req UpdateUserInfoRequest
+	var req models.UserInfo
 	if err := c.ShouldBindJSON(&req); err != nil {
 		logger.Get().Error("error binding JSON", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	userInfo := &models.UserInfo{
-		UserID:      claims.Sub,
-		Name:        req.Name,
-		Income:      req.Income,
-		SavingsGoal: req.SavingsGoal,
-	}
+	req.UserID = claims.Sub
 
-	err := db.UpdateUserInfo(c, claims.Sub, userInfo)
+	err := mongodb.ReplaceUserInfo(c, claims.Sub, &req)
 	if err != nil {
 		logger.Get().Error("error updating user info",
 			zap.String("user_id", claims.Sub),
@@ -121,7 +103,7 @@ func DeleteUserInfo(c *gin.Context) {
 		return
 	}
 
-	err := db.DeleteUserInfo(c, claims.Sub)
+	err := mongodb.DeleteUserInfo(c, claims.Sub)
 	if err != nil {
 		logger.Get().Error("error deleting user info",
 			zap.String("user_id", claims.Sub),
@@ -150,7 +132,7 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	userInfo, err := db.GetUserInfo(c, claims.Sub)
+	userInfo, err := mongodb.GetUserInfo(c, claims.Sub)
 	if err != nil {
 		logger.Get().Error("error retrieving user info",
 			zap.String("user_id", claims.Sub),

@@ -41,13 +41,14 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 	}
 
 	conversationContext := &models.Context{
-		ConversationID: conversationID,
-		UserID:         userID,
-		CreatedAt:      time.Now().Unix(),
-		Transactions:   transactions,
-		Income:         userInfo.Income,
-		SavingsGoal:    userInfo.SavingsGoal,
-		Name:           userInfo.Name,
+		ConversationID:     conversationID,
+		UserID:             userID,
+		CreatedAt:          time.Now().Unix(),
+		Transactions:       transactions,
+		Income:             userInfo.Income,
+		SavingsGoal:        userInfo.SavingsGoal,
+		Name:               userInfo.Name,
+		AdditionalExpenses: userInfo.AdditionalExpenses,
 	}
 
 	logger.Get().Info("conversation context created successfully",
@@ -122,7 +123,7 @@ func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error
 }
 
 func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
-	userInfo, err := db.GetUserInfo(c, userID)
+	userInfo, err := mongodb.GetUserInfo(c, userID)
 	if err != nil {
 		logger.Get().Error("error fetching user info",
 			zap.String("user_id", userID),

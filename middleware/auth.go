@@ -13,13 +13,11 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = logger.Get()
-
 // AuthMiddleware verifies JWT tokens in requests
 func AuthMiddleware(c *gin.Context) {
 	tokenString := extractToken(c.Request)
 	if tokenString == "" {
-		log.Error("missing or invalid token")
+		logger.Get().Error("missing or invalid token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
 		c.Abort()
 		return
@@ -40,14 +38,14 @@ func AuthMiddleware(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Error("error parsing claims", zap.Error(err))
+		logger.Get().Error("error parsing claims", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
 		c.Abort()
 		return
 	}
 
 	if !token.Valid {
-		log.Error("invalid token")
+		logger.Get().Error("invalid token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		c.Abort()
 		return
@@ -55,7 +53,7 @@ func AuthMiddleware(c *gin.Context) {
 
 	// Verify issuer
 	if claims.Issuer != os.Getenv("SUPABASE_URL")+"/auth/v1" {
-		log.Error("invalid token issuer",
+		logger.Get().Error("invalid token issuer",
 			zap.String("issuer", claims.Issuer))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
 		c.Abort()

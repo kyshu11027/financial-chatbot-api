@@ -85,6 +85,7 @@ func GetAllByUserID(userID string) ([]*Conversation, error) {
 		SELECT id, user_id, created_at, title
 		FROM conversations
 		WHERE user_id = $1
+		ORDER BY created_at DESC
 	`
 	items := []*Conversation{}
 

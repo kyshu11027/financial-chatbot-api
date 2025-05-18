@@ -15,13 +15,13 @@ func CreateConversationContext(ctx context.Context, item *models.Context) error 
 	return nil
 }
 
-func UpdateConversationContext(ctx context.Context, conversationID string, updates map[string]interface{}) error {
+func UpdateConversationContext(ctx context.Context, conversationID string, updates map[string]any) error {
 	collection := MongoClient.Database(MongoDatabase).Collection(ContextCollection)
 
 	_, err := collection.UpdateOne(
 		ctx,
-		map[string]interface{}{"conversation_id": conversationID},
-		map[string]interface{}{
+		map[string]any{"conversation_id": conversationID},
+		map[string]any{
 			"$set": updates,
 		},
 	)

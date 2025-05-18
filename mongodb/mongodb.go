@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	ContextCollection string = "contexts"
-	MessageCollection string = "messages"
-	MongoDatabase     string = "conversations"
-	MongoClient       *mongo.Client
+	ContextCollection  string = "contexts"
+	MessageCollection  string = "messages"
+	UserInfoCollection string = "user_info"
+	MongoDatabase      string = "conversations"
+	MongoClient        *mongo.Client
 )
 
 func InitMongoDB() error {
