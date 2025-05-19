@@ -8,7 +8,8 @@ type Context struct {
 	Income             float64       `json:"income" bson:"income"`
 	SavingsGoal        float64       `json:"savings_goal" bson:"savings_goal"`
 	Transactions       []Transaction `json:"transactions" bson:"transactions"`
-	AdditionalExpenses []Expense     `bson:"additional_monthly_expenses" json:"additional_monthly_expenses"`
+	AdditionalExpenses []Expense     `json:"additional_monthly_expenses" bson:"additional_monthly_expenses"`
+	Accounts           []Account     `json:"accounts" bson:"accounts"`
 }
 
 type Message struct {

@@ -24,9 +24,26 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		zap.String("user_id", userID),
 		zap.String("conversation_id", conversationID))
 
-	transactions, err := getTransactions(c, userID)
+	items, err := db.GetPlaidItemsByUserID(userID)
+	if err != nil {
+		logger.Get().Error("error fetching plaid items",
+			zap.String("user_id", userID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil, err
+	}
+
+	transactions, err := getTransactions(c, items)
 	if err != nil {
 		logger.Get().Error("error getting transactions",
+			zap.String("user_id", userID),
+			zap.Error(err))
+		return nil, err
+	}
+
+	accounts, err := getAccounts(c, items)
+	if err != nil {
+		logger.Get().Error("error getting accounts",
 			zap.String("user_id", userID),
 			zap.Error(err))
 		return nil, err
@@ -45,6 +62,7 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		UserID:             userID,
 		CreatedAt:          time.Now().Unix(),
 		Transactions:       transactions,
+		Accounts:           accounts,
 		Income:             userInfo.Income,
 		SavingsGoal:        userInfo.SavingsGoal,
 		Name:               userInfo.Name,
@@ -57,28 +75,17 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 	return conversationContext, nil
 }
 
-func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error) {
-	logger.Get().Info("fetching plaid items",
-		zap.String("user_id", userID))
-
-	plaidItems, err := db.GetPlaidItemsByUserID(userID)
-	if err != nil {
-		logger.Get().Error("error fetching plaid items",
-			zap.String("user_id", userID),
-			zap.Error(err))
-		return nil, err
-	}
+func getTransactions(c *gin.Context, items []*db.PlaidItem) ([]models.Transaction, error) {
 
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -180).Format("2006-01-02")
 	transactions := []models.Transaction{}
 
 	logger.Get().Info("fetching transactions",
-		zap.String("user_id", userID),
 		zap.String("start_date", startDate),
 		zap.String("end_date", endDate))
 
-	for _, plaidItem := range plaidItems {
+	for _, plaidItem := range items {
 		logger.Get().Debug("fetching transactions for plaid item",
 			zap.String("access_token", plaidItem.AccessToken))
 
@@ -117,10 +124,65 @@ func getTransactions(c *gin.Context, userID string) ([]models.Transaction, error
 	}
 
 	logger.Get().Info("all transactions retrieved successfully",
-		zap.String("user_id", userID),
 		zap.Int("total_transactions", len(transactions)))
 	return transactions, nil
 }
+
+func getAccounts(c *gin.Context, items []*db.PlaidItem) ([]models.Account, error) {
+    var accounts []models.Account
+
+    for _, item := range items {
+        req := plaid.NewAccountsGetRequest(item.AccessToken)
+        resp, _, err := PlaidClient.PlaidApi.
+            AccountsGet(c.Request.Context()).
+            AccountsGetRequest(*req).
+            Execute()
+        if err != nil {
+            logger.Get().Error("failed to get accounts",
+                zap.String("item_id", item.ItemID),
+                zap.Error(err))
+            continue
+        }
+
+        for _, acct := range resp.GetAccounts() {
+            plaidBalances := acct.GetBalances()
+
+            account := models.Account{
+                AccountID:    acct.GetAccountId(),
+                Name:         acct.GetName(),
+                OfficialName: acct.GetOfficialName(),
+                Type:         string(acct.GetType()),
+                Subtype:      string(acct.GetSubtype()),
+                Mask:         acct.GetMask(),
+            }
+
+			var available *float32
+			if plaidBalances.Available.IsSet() {
+    			v := plaidBalances.Available.Get()
+    			available = v
+			}
+
+			var limit *float32
+			if plaidBalances.Limit.IsSet() {
+    			v := plaidBalances.Limit.Get()
+    			limit = v
+			}
+
+			account.Balances = models.Balances{
+			    Available:              available,
+			    Current:                plaidBalances.GetCurrent(),
+		        IsoCurrencyCode:        plaidBalances.GetIsoCurrencyCode(),
+		        Limit:                  limit,
+			}
+
+            accounts = append(accounts, account)
+        }
+    }
+
+    return accounts, nil
+}
+
+
 
 func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
 	userInfo, err := mongodb.GetUserInfo(c, userID)

@@ -249,3 +249,52 @@ func GetItems(c *gin.Context) {
 		zap.Int("item_count", len(items)))
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
+
+func GetItemsWithAccounts(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	items, err := db.GetPlaidItemsByUserID(claims.Sub)
+	if err != nil {
+		logger.Get().Error("error fetching plaid items",
+			zap.String("user_id", claims.Sub),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	type ItemWithAccounts struct {
+		ItemID   string              `json:"item_id"`
+		Accounts []plaid.AccountBase `json:"accounts"`
+	}
+
+	var response []ItemWithAccounts
+
+	for _, item := range items {
+		req := plaid.NewAccountsGetRequest(item.AccessToken)
+		resp, _, err := PlaidClient.PlaidApi.AccountsGet(c.Request.Context()).AccountsGetRequest(*req).Execute()
+		if err != nil {
+			logger.Get().Error("failed to get accounts",
+				zap.String("item_id", item.ItemID),
+				zap.Error(err))
+			continue
+		}
+		response = append(response, ItemWithAccounts{
+			ItemID:   item.ItemID,
+			Accounts: resp.GetAccounts(),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": response})
+}
