@@ -1,7 +1,6 @@
 package models
 
 type UserInfo struct {
-	ID                 string    `bson:"_id" json:"id"`
 	UserID             string    `bson:"user_id" json:"user_id"`
 	Name               string    `bson:"name" json:"name"`
 	Income             float64   `bson:"income" json:"income"`
