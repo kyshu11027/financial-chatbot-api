@@ -147,7 +147,7 @@ func (wp *WorkerPool) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 		avgProcessingTime = wp.processingDuration / wp.messagesProcessed
 	}
 
-	metrics := map[string]interface{}{
+	metrics := map[string]any{
 		"messages_processed": wp.messagesProcessed,
 		"messages_dropped":   wp.messagesDropped,
 		"avg_processing_ms":  avgProcessingTime,
