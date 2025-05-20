@@ -129,60 +129,58 @@ func getTransactions(c *gin.Context, items []*db.PlaidItem) ([]models.Transactio
 }
 
 func getAccounts(c *gin.Context, items []*db.PlaidItem) ([]models.Account, error) {
-    var accounts []models.Account
+	var accounts []models.Account
 
-    for _, item := range items {
-        req := plaid.NewAccountsGetRequest(item.AccessToken)
-        resp, _, err := PlaidClient.PlaidApi.
-            AccountsGet(c.Request.Context()).
-            AccountsGetRequest(*req).
-            Execute()
-        if err != nil {
-            logger.Get().Error("failed to get accounts",
-                zap.String("item_id", item.ItemID),
-                zap.Error(err))
-            continue
-        }
+	for _, item := range items {
+		req := plaid.NewAccountsGetRequest(item.AccessToken)
+		resp, _, err := PlaidClient.PlaidApi.
+			AccountsGet(c.Request.Context()).
+			AccountsGetRequest(*req).
+			Execute()
+		if err != nil {
+			logger.Get().Error("failed to get accounts",
+				zap.String("item_id", item.ItemID),
+				zap.Error(err))
+			continue
+		}
 
-        for _, acct := range resp.GetAccounts() {
-            plaidBalances := acct.GetBalances()
+		for _, acct := range resp.GetAccounts() {
+			plaidBalances := acct.GetBalances()
 
-            account := models.Account{
-                AccountID:    acct.GetAccountId(),
-                Name:         acct.GetName(),
-                OfficialName: acct.GetOfficialName(),
-                Type:         string(acct.GetType()),
-                Subtype:      string(acct.GetSubtype()),
-                Mask:         acct.GetMask(),
-            }
+			account := models.Account{
+				AccountID:    acct.GetAccountId(),
+				Name:         acct.GetName(),
+				OfficialName: acct.GetOfficialName(),
+				Type:         string(acct.GetType()),
+				Subtype:      string(acct.GetSubtype()),
+				Mask:         acct.GetMask(),
+			}
 
 			var available *float32
 			if plaidBalances.Available.IsSet() {
-    			v := plaidBalances.Available.Get()
-    			available = v
+				v := plaidBalances.Available.Get()
+				available = v
 			}
 
 			var limit *float32
 			if plaidBalances.Limit.IsSet() {
-    			v := plaidBalances.Limit.Get()
-    			limit = v
+				v := plaidBalances.Limit.Get()
+				limit = v
 			}
 
 			account.Balances = models.Balances{
-			    Available:              available,
-			    Current:                plaidBalances.GetCurrent(),
-		        IsoCurrencyCode:        plaidBalances.GetIsoCurrencyCode(),
-		        Limit:                  limit,
+				Available:       available,
+				Current:         plaidBalances.GetCurrent(),
+				IsoCurrencyCode: plaidBalances.GetIsoCurrencyCode(),
+				Limit:           limit,
 			}
 
-            accounts = append(accounts, account)
-        }
-    }
+			accounts = append(accounts, account)
+		}
+	}
 
-    return accounts, nil
+	return accounts, nil
 }
-
-
 
 func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
 	userInfo, err := mongodb.GetUserInfo(c, userID)

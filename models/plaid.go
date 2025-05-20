@@ -11,18 +11,18 @@ type Transaction struct {
 }
 
 type Account struct {
-	AccountID      string   `json:"account_id" bson:"account_id"`
-	Name           string   `json:"name" bson:"name"`
-	OfficialName   string   `json:"official_name" bson:"official_name"`
-	Type           string   `json:"type" bson:"type"`
-	Subtype        string   `json:"subtype" bson:"subtype"`
-	Mask           string   `json:"mask" bson:"mask"`
-	Balances       Balances `json:"balances" bson:"balances"`
+	AccountID    string   `json:"account_id" bson:"account_id"`
+	Name         string   `json:"name" bson:"name"`
+	OfficialName string   `json:"official_name" bson:"official_name"`
+	Type         string   `json:"type" bson:"type"`
+	Subtype      string   `json:"subtype" bson:"subtype"`
+	Mask         string   `json:"mask" bson:"mask"`
+	Balances     Balances `json:"balances" bson:"balances"`
 }
 
 type Balances struct {
-	Available              *float32 `json:"available" bson:"available"`
-	Current                float32  `json:"current" bson:"current"`
-	IsoCurrencyCode        string   `json:"iso_currency_code" bson:"iso_currency_code"`
-	Limit                  *float32 `json:"limit" bson:"limit"`
+	Available       *float32 `json:"available" bson:"available"`
+	Current         float32  `json:"current" bson:"current"`
+	IsoCurrencyCode string   `json:"iso_currency_code" bson:"iso_currency_code"`
+	Limit           *float32 `json:"limit" bson:"limit"`
 }

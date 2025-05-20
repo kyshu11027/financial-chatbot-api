@@ -13,9 +13,10 @@ import (
 const openaiURL = "https://api.openai.com/v1/chat/completions"
 
 type OpenAIRequest struct {
-	Model     string    `json:"model"`
-	Messages  []Message `json:"messages"`
-	MaxTokens int       `json:"max_tokens"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	MaxTokens   int       `json:"max_tokens"`
+	Temperature float64   `json:"temperature"`
 }
 
 type Message struct {
@@ -33,8 +34,9 @@ type OpenAIResponse struct {
 
 func GenerateChatTitle(userMessage string) (string, error) {
 	reqBody := OpenAIRequest{
-		Model:     "gpt-3.5-turbo",
-		MaxTokens: 20,
+		Model:       "gpt-3.5-turbo",
+		MaxTokens:   20,
+		Temperature: 0.3,
 		Messages: []Message{
 			{Role: "system", Content: "You are a helpful assistant that generates short, descriptive titles for financial advice chat conversations. Keep it under 5 words using only alphanumeric characters."},
 			{Role: "user", Content: fmt.Sprintf("Create a short title for this chat: %q", userMessage)},
@@ -72,8 +74,7 @@ func GenerateChatTitle(userMessage string) (string, error) {
 }
 
 func cleanString(input string) string {
-	// Define regex pattern: keep only letters, digits, and spaces
-	re := regexp.MustCompile(`[^a-zA-Z0-9 ':,]+`)
+	re := regexp.MustCompile(`[^a-zA-Z0-9 ':,;-]+`)
 	cleaned := re.ReplaceAllString(input, "")
 	return cleaned
 }
