@@ -1,10 +1,8 @@
 package kafka
 
 import (
-	"encoding/json"
 	"finance-chatbot/api/logger"
-	"finance-chatbot/api/models"
-	"finance-chatbot/api/sse"
+	"finance-chatbot/api/worker"
 	"os"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -16,6 +14,7 @@ var (
 	MessageTopic    string = "user_message"
 	ResponseTopic   string = "ai_response"
 	GroupID         string = "ai-response-consumer"
+	WorkerPool      *worker.WorkerPool
 )
 
 func InitProducer() error {
@@ -61,6 +60,35 @@ func ProduceMessage(topic string, message []byte) error {
 }
 
 func StartKafkaConsumer() error {
+	// Get the number of partitions for the topic
+	admin, err := kafka.NewAdminClient(&kafka.ConfigMap{
+		"bootstrap.servers": os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
+		"security.protocol": "SASL_SSL",
+		"sasl.mechanisms":   "PLAIN",
+		"sasl.username":     os.Getenv("KAFKA_API_KEY"),
+		"sasl.password":     os.Getenv("KAFKA_API_SECRET"),
+	})
+	if err != nil {
+		logger.Get().Error("failed to create admin client", zap.Error(err))
+		return err
+	}
+	defer admin.Close()
+
+	metadata, err := admin.GetMetadata(&ResponseTopic, false, 10000)
+	if err != nil {
+		logger.Get().Error("failed to get topic metadata", zap.Error(err))
+		return err
+	}
+
+	numPartitions := len(metadata.Topics[ResponseTopic].Partitions)
+	logger.Get().Info("Topic partition count",
+		zap.String("topic", ResponseTopic),
+		zap.Int("partitions", numPartitions))
+
+	// Initialize worker pool with number of workers matching partitions
+	WorkerPool = worker.NewWorkerPool(numPartitions)
+	WorkerPool.Start()
+
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
 		"security.protocol":  "SASL_SSL",
@@ -89,7 +117,8 @@ func StartKafkaConsumer() error {
 
 	logger.Get().Info("Kafka consumer started successfully",
 		zap.String("topic", ResponseTopic),
-		zap.String("group_id", GroupID))
+		zap.String("group_id", GroupID),
+		zap.Int("partitions", numPartitions))
 
 	go func() {
 		for {
@@ -97,21 +126,11 @@ func StartKafkaConsumer() error {
 			if err == nil {
 				logger.Get().Debug("received message",
 					zap.String("topic", ResponseTopic),
-					zap.String("value", string(msg.Value)))
+					zap.String("value", string(msg.Value)),
+					zap.Int32("partition", msg.TopicPartition.Partition))
 
-				var aiResponse models.AIResponse
-				chunk := string(msg.Value)
-				if err := json.Unmarshal(msg.Value, &aiResponse); err != nil {
-					logger.Get().Error("failed to unmarshal message",
-						zap.String("topic", ResponseTopic),
-						zap.Error(err))
-					continue
-				}
-
-				conversationID := aiResponse.ConversationID
-				logger.Get().Debug("sending chunk to client",
-					zap.String("conversation_id", conversationID))
-				sse.SendChunkToClient(conversationID, chunk)
+				// Submit the message to the worker pool with its partition
+				WorkerPool.Submit(msg.Value, msg.TopicPartition.Partition)
 			} else {
 				logger.Get().Error("consumer error",
 					zap.String("topic", ResponseTopic),

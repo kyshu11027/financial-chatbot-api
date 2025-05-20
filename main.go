@@ -9,6 +9,8 @@ import (
 	"finance-chatbot/api/mongodb"
 	"flag"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -76,6 +78,7 @@ func main() {
 	if err != nil {
 		logger.Get().Fatal("Failed to start Kafka consumer", zap.Error(err))
 	}
+	defer kafka.WorkerPool.Stop()
 
 	// API routes
 	api := router.Group("/api")
@@ -99,6 +102,9 @@ func main() {
 		api.POST("/user-info/get", handlers.GetUserInfo)
 	}
 	router.GET("/sse/:conversationID", handlers.HandleSSE)
+	router.GET("/metrics", func(c *gin.Context) {
+		kafka.WorkerPool.MetricsHandler(c.Writer, c.Request)
+	})
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -106,8 +112,17 @@ func main() {
 		port = "8080"
 	}
 
-	logger.Get().Info("Server starting", zap.String("port", port))
-	if err := router.Run(":" + port); err != nil {
-		logger.Get().Fatal("Failed to start server", zap.Error(err))
-	}
+	// Set up graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		logger.Get().Info("Server starting", zap.String("port", port))
+		if err := router.Run(":" + port); err != nil {
+			logger.Get().Fatal("Failed to start server", zap.Error(err))
+		}
+	}()
+
+	<-quit
+	logger.Get().Info("Shutting down server...")
 }
