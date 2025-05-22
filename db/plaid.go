@@ -2,29 +2,19 @@ package db
 
 import (
 	"database/sql"
+	"finance-chatbot/api/models"
 	"fmt"
 )
 
-// PlaidItem represents a Plaid item in the database
-type PlaidItem struct {
-	ID          string
-	UserID      string
-	AccessToken string
-	ItemID      string
-	Status      string
-	CreatedAt   sql.NullTime
-	UpdatedAt   sql.NullTime
-}
-
 // CreatePlaidItem creates a new Plaid item in the database
-func CreatePlaidItem(userID, accessToken, itemID string) (*PlaidItem, error) {
+func CreatePlaidItem(userID, accessToken, itemID string) (*models.PlaidItem, error) {
 	query := `
 		INSERT INTO plaid_items (user_id, access_token, item_id, status)
 		VALUES ($1, $2, $3, 'active')
 		RETURNING id, user_id, access_token, item_id, status, created_at, updated_at
 	`
 
-	item := &PlaidItem{}
+	item := &models.PlaidItem{}
 	err := DB.QueryRow(query, userID, accessToken, itemID).Scan(
 		&item.ID,
 		&item.UserID,
@@ -42,7 +32,7 @@ func CreatePlaidItem(userID, accessToken, itemID string) (*PlaidItem, error) {
 }
 
 // GetPlaidItemsByUserID retrieves all Plaid items for a user
-func GetPlaidItemsByUserID(userID string) ([]*PlaidItem, error) {
+func GetPlaidItemsByUserID(userID string) ([]*models.PlaidItem, error) {
 	query := `
 		SELECT id, user_id, access_token, item_id, status, created_at, updated_at
 		FROM plaid_items
@@ -56,9 +46,9 @@ func GetPlaidItemsByUserID(userID string) ([]*PlaidItem, error) {
 	}
 	defer rows.Close()
 
-	var items []*PlaidItem
+	var items []*models.PlaidItem
 	for rows.Next() {
-		item := &PlaidItem{}
+		item := &models.PlaidItem{}
 		err := rows.Scan(
 			&item.ID,
 			&item.UserID,
@@ -107,14 +97,14 @@ func UpdatePlaidItemStatus(itemID, status string) error {
 }
 
 // GetPlaidItemByItemID retrieves a Plaid item by its item_id
-func GetPlaidItemByItemID(itemID string) (*PlaidItem, error) {
+func GetPlaidItemByItemID(itemID string) (*models.PlaidItem, error) {
 	query := `
 		SELECT id, user_id, access_token, item_id, status, created_at, updated_at
 		FROM plaid_items
 		WHERE item_id = $1
 	`
 
-	item := &PlaidItem{}
+	item := &models.PlaidItem{}
 	err := DB.QueryRow(query, itemID).Scan(
 		&item.ID,
 		&item.UserID,

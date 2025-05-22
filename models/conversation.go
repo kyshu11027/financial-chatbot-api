@@ -1,5 +1,11 @@
 package models
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 type Context struct {
 	ConversationID     string        `json:"conversation_id" bson:"conversation_id"`
 	UserID             string        `json:"user_id" bson:"user_id"`
@@ -24,4 +30,11 @@ type Message struct {
 type AIResponse struct {
 	Message
 	LastMessage bool `json:"last_message" bson:"last_message"`
+}
+
+type Conversation struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    string    `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Title     string    `json:"title"`
 }

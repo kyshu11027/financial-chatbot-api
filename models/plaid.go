@@ -1,5 +1,7 @@
 package models
 
+import "database/sql"
+
 type Transaction struct {
 	TransactionID string   `json:"transaction_id"`
 	Date          string   `json:"date"`
@@ -25,4 +27,14 @@ type Balances struct {
 	Current         float32  `json:"current" bson:"current"`
 	IsoCurrencyCode string   `json:"iso_currency_code" bson:"iso_currency_code"`
 	Limit           *float32 `json:"limit" bson:"limit"`
+}
+
+type PlaidItem struct {
+	ID          string
+	UserID      string
+	AccessToken string
+	ItemID      string
+	Status      string
+	CreatedAt   sql.NullTime
+	UpdatedAt   sql.NullTime
 }

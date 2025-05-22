@@ -25,17 +25,13 @@ func HandleSSE(c *gin.Context) {
 
 	conversationID := c.Param("conversationID")
 
-	messageChan := make(chan string, 100)
-	// doneChan := make(chan struct{})
-
 	clientStream := &sse.ClientStream{
-		Messages: messageChan,
-		// Done:     doneChan,
+		Messages:      make(chan string, 100),
+		BufferFlushed: make(chan struct{}), // NEW: signal for buffered message flushing
 	}
 
-	sse.Mu.Lock()
-	sse.SSEConnections[conversationID] = clientStream
-	sse.Mu.Unlock()
+	// Register client and flush any buffered chunks
+	sse.RegisterClient(conversationID, clientStream)
 
 	logger.Get().Info("SSE connection established",
 		zap.String("conversation_id", conversationID))
@@ -44,9 +40,7 @@ func HandleSSE(c *gin.Context) {
 	defer func() {
 		logger.Get().Info("closing SSE connection",
 			zap.String("conversation_id", conversationID))
-		sse.Mu.Lock()
-		delete(sse.SSEConnections, conversationID)
-		sse.Mu.Unlock()
+		sse.UnregisterClient(conversationID)
 		logger.Get().Info("SSE connection closed",
 			zap.String("conversation_id", conversationID))
 	}()
@@ -58,16 +52,19 @@ func HandleSSE(c *gin.Context) {
 		return
 	}
 
+	// Setup streaming headers
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 
+	// Stream loop
 	c.Stream(func(w io.Writer) bool {
 		select {
-		case msg, ok := <-messageChan:
+		case msg, ok := <-clientStream.Messages:
 			if !ok {
 				return false
 			}
+
 			payload, err := json.Marshal(SSEMessage{Message: msg})
 			if err != nil {
 				logger.Get().Error("failed to marshal SSE message",
@@ -79,6 +76,7 @@ func HandleSSE(c *gin.Context) {
 			c.Writer.Write([]byte("data: " + string(payload) + "\n\n"))
 			flusher.Flush()
 			return true
+
 		case <-c.Request.Context().Done():
 			logger.Get().Info("SSE context done",
 				zap.String("conversation_id", conversationID),

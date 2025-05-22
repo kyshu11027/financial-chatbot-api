@@ -1,25 +1,14 @@
 package db
 
-import (
-	"time"
+import "finance-chatbot/api/models"
 
-	"github.com/google/uuid"
-)
-
-type Conversation struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    string    `json:"user_id"`
-	CreatedAt time.Time `json:"created_at"`
-	Title     string    `json:"title"`
-}
-
-func CreateConversation(userID string, title string) (*Conversation, error) {
+func CreateConversation(userID string, title string) (*models.Conversation, error) {
 	query := `
 		INSERT INTO conversations (user_id, title)
 		VALUES ($1, $2)
 		RETURNING id, title, user_id, created_at
 	`
-	item := &Conversation{}
+	item := &models.Conversation{}
 
 	err := DB.QueryRow(query, userID, title).Scan(
 		&item.ID,
@@ -28,7 +17,7 @@ func CreateConversation(userID string, title string) (*Conversation, error) {
 		&item.CreatedAt,
 	)
 	if err != nil {
-		return &Conversation{}, err
+		return &models.Conversation{}, err
 	}
 
 	return item, nil
@@ -47,13 +36,13 @@ func DeleteConversation(id string) error {
 	return nil
 }
 
-func GetByID(id string) (*Conversation, error) {
+func GetByID(id string) (*models.Conversation, error) {
 	query := `
 		SELECT id, user_id, created_at, title
 		FROM conversations
 		WHERE id = $1
 	`
-	item := &Conversation{}
+	item := &models.Conversation{}
 	err := DB.QueryRow(query, id).Scan(
 		&item.ID,
 		&item.UserID,
@@ -80,14 +69,14 @@ func Delete(id string) error {
 	return nil
 }
 
-func GetAllByUserID(userID string) ([]*Conversation, error) {
+func GetAllByUserID(userID string) ([]*models.Conversation, error) {
 	query := `
 		SELECT id, user_id, created_at, title
 		FROM conversations
 		WHERE user_id = $1
 		ORDER BY created_at DESC
 	`
-	items := []*Conversation{}
+	items := []*models.Conversation{}
 
 	rows, err := DB.Query(query, userID)
 	if err != nil {
@@ -96,7 +85,7 @@ func GetAllByUserID(userID string) ([]*Conversation, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		item := &Conversation{}
+		item := &models.Conversation{}
 		err := rows.Scan(
 			&item.ID,
 			&item.UserID,
@@ -112,7 +101,7 @@ func GetAllByUserID(userID string) ([]*Conversation, error) {
 	return items, nil
 }
 
-func Update(id string, title string) (*Conversation, error) {
+func Update(id string, title string) (*models.Conversation, error) {
 	query := `
 		UPDATE conversations
 		SET title = $1
@@ -120,7 +109,7 @@ func Update(id string, title string) (*Conversation, error) {
 		RETURNING id, user_id, created_at, title
 	`
 
-	item := &Conversation{}
+	item := &models.Conversation{}
 	err := DB.QueryRow(query, title, id).Scan(
 		&item.ID,
 		&item.UserID,

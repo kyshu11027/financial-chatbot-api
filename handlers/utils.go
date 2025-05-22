@@ -75,7 +75,7 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 	return conversationContext, nil
 }
 
-func getTransactions(c *gin.Context, items []*db.PlaidItem) ([]models.Transaction, error) {
+func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transaction, error) {
 
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -180).Format("2006-01-02")
@@ -128,7 +128,7 @@ func getTransactions(c *gin.Context, items []*db.PlaidItem) ([]models.Transactio
 	return transactions, nil
 }
 
-func getAccounts(c *gin.Context, items []*db.PlaidItem) ([]models.Account, error) {
+func getAccounts(c *gin.Context, items []*models.PlaidItem) ([]models.Account, error) {
 	var accounts []models.Account
 
 	for _, item := range items {
