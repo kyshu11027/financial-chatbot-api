@@ -1,16 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
-	"io"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/plaid/plaid-go/plaid"
+	"github.com/plaid/plaid-go/v20/plaid"
 	"go.uber.org/zap"
 )
 
@@ -24,10 +21,6 @@ type CreateLinkTokenRequest struct {
 
 type ExchangeTokenRequest struct {
 	PublicToken string `json:"public_token" binding:"required"`
-}
-
-type GetTransactionsRequest struct {
-	AccessToken string `json:"access_token" binding:"required"`
 }
 
 func CreateLinkToken(c *gin.Context) {
@@ -160,63 +153,41 @@ func ExchangePublicToken(c *gin.Context) {
 }
 
 func GetTransactions(c *gin.Context) {
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		logger.Get().Error("failed to read request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	logger.Get().Debug("raw request body", zap.String("body", string(bodyBytes)))
-
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	var req GetTransactionsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Get().Error("error binding JSON", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
-	endDate := time.Now().Format("2006-01-02")
-	startDate := time.Now().AddDate(0, 0, -200).Format("2006-01-02")
-	logger.Get().Info("fetching transactions",
-		zap.String("start_date", startDate),
-		zap.String("end_date", endDate))
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
 
-	request := plaid.NewTransactionsGetRequest(
-		req.AccessToken,
-		startDate,
-		endDate,
-	)
-
-	result, httpResp, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
+	items, err := db.GetPlaidItemsByUserID(claims.Sub)
 	if err != nil {
-		body, _ := io.ReadAll(httpResp.Body)
-		logger.Get().Error("plaid API error",
-			zap.String("response_body", string(body)),
+		logger.Get().Error("error fetching plaid items",
+			zap.String("user_id", claims.Sub),
 			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	plaidTransactions := result.GetTransactions()
-	logger.Get().Info("fetched transactions",
-		zap.Int("count", len(plaidTransactions)))
-
-	transactions := make([]models.Transaction, 0)
-	for _, t := range plaidTransactions {
-		transaction := models.Transaction{
-			TransactionID: t.GetTransactionId(),
-			Date:          t.GetDate(),
-			Amount:        t.GetAmount(),
-			Name:          t.GetName(),
-			MerchantName:  t.GetMerchantName(),
-			Category:      t.GetCategory(),
-			Pending:       t.GetPending(),
+	transactions, err := getTransactions(c, items)
+	if err != nil {
+		// logger.Get().Error("error getting transactions",
+		// 	zap.String("user_id", claims.Sub),
+		// 	zap.Error(err))
+		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
+    		body := plaidErr.Body()
+    		logger.Get().Error("plaid API error raw body", zap.String("body", string(body)))
+    		// existing error handling code here ...
 		}
-		transactions = append(transactions, transaction)
+		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }
 

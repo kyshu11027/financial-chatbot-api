@@ -1,11 +1,14 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type Transaction struct {
 	TransactionID string   `json:"transaction_id"`
 	Date          string   `json:"date"`
-	Amount        float32  `json:"amount"`
+	Amount        float64  `json:"amount"`
 	Name          string   `json:"name"`
 	MerchantName  string   `json:"merchant_name"`
 	Category      []string `json:"category"`
@@ -23,10 +26,10 @@ type Account struct {
 }
 
 type Balances struct {
-	Available       *float32 `json:"available" bson:"available"`
-	Current         float32  `json:"current" bson:"current"`
+	Available       *float64 `json:"available" bson:"available"`
+	Current         float64  `json:"current" bson:"current"`
 	IsoCurrencyCode string   `json:"iso_currency_code" bson:"iso_currency_code"`
-	Limit           *float32 `json:"limit" bson:"limit"`
+	Limit           *float64 `json:"limit" bson:"limit"`
 }
 
 type PlaidItem struct {
@@ -37,4 +40,16 @@ type PlaidItem struct {
 	Status      string
 	CreatedAt   sql.NullTime
 	UpdatedAt   sql.NullTime
+}
+
+type PlaidError struct {
+	ErrorType    string `json:"error_type"`
+	ErrorCode    string `json:"error_code"`
+	ErrorMessage string `json:"error_message"`
+	RequestId    string `json:"request_id"`
+}
+
+func (e *PlaidError) Error() string {
+	return fmt.Sprintf("Plaid API error: %s (type: %s, code: %s, request_id: %s)",
+		e.ErrorMessage, e.ErrorType, e.ErrorCode, e.RequestId)
 }

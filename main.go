@@ -14,7 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/plaid/plaid-go/plaid"
+	"github.com/plaid/plaid-go/v20/plaid"
 	"go.uber.org/zap"
 )
 

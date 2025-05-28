@@ -9,13 +9,12 @@ import (
 	"finance-chatbot/api/models"
 	"finance-chatbot/api/mongodb"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/plaid/plaid-go/plaid"
+	"github.com/plaid/plaid-go/v20/plaid"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +28,6 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		logger.Get().Error("error fetching plaid items",
 			zap.String("user_id", userID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return nil, err
 	}
 
@@ -76,7 +74,6 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 }
 
 func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transaction, error) {
-
 	endDate := time.Now().Format("2006-01-02")
 	startDate := time.Now().AddDate(0, 0, -180).Format("2006-01-02")
 	transactions := []models.Transaction{}
@@ -89,19 +86,45 @@ func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transa
 		logger.Get().Debug("fetching transactions for plaid item",
 			zap.String("access_token", plaidItem.AccessToken))
 
-		request := plaid.NewTransactionsGetRequest(
-			plaidItem.AccessToken,
-			startDate,
-			endDate,
-		)
+		request := plaid.TransactionsGetRequest{
+			AccessToken: plaidItem.AccessToken,
+			StartDate:   startDate,
+			EndDate:     endDate,
+		}
 
-		result, _, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(*request).Execute()
+		result, _, err := PlaidClient.PlaidApi.TransactionsGet(c.Request.Context()).TransactionsGetRequest(request).Execute()
 		if err != nil {
-			logger.Get().Error("error fetching transactions for plaid item",
-				zap.String("access_token", plaidItem.AccessToken),
-				zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return nil, err
+			if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
+				body := plaidErr.Body()
+
+				var plaidAPIError models.PlaidError
+				if unmarshalErr := json.Unmarshal(body, &plaidAPIError); unmarshalErr != nil {
+					logger.Get().Error("failed to unmarshal Plaid error body",
+						zap.String("raw_body", string(body)),
+						zap.Error(unmarshalErr),
+						zap.Error(plaidErr))
+					return nil, fmt.Errorf("failed to unmarshal Plaid error: %w", unmarshalErr)
+				}
+
+				// Log full structured error
+				logger.Get().Error("plaid API error",
+					zap.String("error_type", plaidAPIError.ErrorType),
+					zap.String("error_code", plaidAPIError.ErrorCode),
+					zap.String("error_message", plaidAPIError.ErrorMessage),
+					zap.Error(plaidErr),
+				)
+
+				// Return structured error
+				return nil, &models.PlaidError{
+					ErrorType:    plaidAPIError.ErrorType,
+					ErrorCode:    plaidAPIError.ErrorCode,
+					ErrorMessage: plaidAPIError.ErrorMessage,
+					RequestId:    plaidAPIError.RequestId,
+				}
+			}
+			// fallback for non-Plaid errors
+			logger.Get().Error("unexpected error fetching transactions", zap.Error(err))
+			return nil, fmt.Errorf("failed to fetch transactions: %w", err)
 		}
 
 		plaidTransactions := result.GetTransactions()
@@ -156,13 +179,13 @@ func getAccounts(c *gin.Context, items []*models.PlaidItem) ([]models.Account, e
 				Mask:         acct.GetMask(),
 			}
 
-			var available *float32
+			var available *float64
 			if plaidBalances.Available.IsSet() {
 				v := plaidBalances.Available.Get()
 				available = v
 			}
 
-			var limit *float32
+			var limit *float64
 			if plaidBalances.Limit.IsSet() {
 				v := plaidBalances.Limit.Get()
 				limit = v
@@ -230,8 +253,6 @@ func authenticateSSE(c *gin.Context) error {
 	tokenString := c.DefaultQuery("token", "")
 	if tokenString == "" {
 		logger.Get().Error("missing or invalid token")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
-		c.Abort()
 		return fmt.Errorf("missing or invalid token")
 	}
 
@@ -249,23 +270,17 @@ func authenticateSSE(c *gin.Context) error {
 
 	if err != nil {
 		logger.Get().Error("error parsing claims", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
-		c.Abort()
 		return err
 	}
 
 	if !token.Valid {
 		logger.Get().Error("invalid token")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		c.Abort()
 		return err
 	}
 
 	if claims.Issuer != os.Getenv("SUPABASE_URL")+"/auth/v1" {
 		logger.Get().Error("invalid token issuer",
 			zap.String("issuer", claims.Issuer))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
-		c.Abort()
 		return err
 	}
 	return nil
