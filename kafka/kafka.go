@@ -19,9 +19,9 @@ var (
 
 func InitProducer() error {
 	config := &kafka.ConfigMap{
-		"bootstrap.servers": os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
-		"sasl.username":     os.Getenv("KAFKA_API_KEY"),
-		"sasl.password":     os.Getenv("KAFKA_API_SECRET"),
+		"bootstrap.servers": os.Getenv("KAFKA_SERVER"),
+		"sasl.username":     os.Getenv("KAFKA_USERNAME"),
+		"sasl.password":     os.Getenv("KAFKA_PASSWORD"),
 		"security.protocol": "SASL_SSL",
 		"sasl.mechanism":    "PLAIN",
 	}
@@ -62,11 +62,11 @@ func ProduceMessage(topic string, message []byte) error {
 func StartKafkaConsumer() error {
 	// Get the number of partitions for the topic
 	admin, err := kafka.NewAdminClient(&kafka.ConfigMap{
-		"bootstrap.servers": os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
+		"bootstrap.servers": os.Getenv("KAFKA_SERVER"),
 		"security.protocol": "SASL_SSL",
 		"sasl.mechanisms":   "PLAIN",
-		"sasl.username":     os.Getenv("KAFKA_API_KEY"),
-		"sasl.password":     os.Getenv("KAFKA_API_SECRET"),
+		"sasl.username":     os.Getenv("KAFKA_USERNAME"),
+		"sasl.password":     os.Getenv("KAFKA_PASSWORD"),
 	})
 	if err != nil {
 		logger.Get().Error("failed to create admin client", zap.Error(err))
@@ -90,11 +90,11 @@ func StartKafkaConsumer() error {
 	WorkerPool.Start()
 
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":  os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
+		"bootstrap.servers":  os.Getenv("KAFKA_SERVER"),
 		"security.protocol":  "SASL_SSL",
 		"sasl.mechanisms":    "PLAIN",
-		"sasl.username":      os.Getenv("KAFKA_API_KEY"),
-		"sasl.password":      os.Getenv("KAFKA_API_SECRET"),
+		"sasl.username":      os.Getenv("KAFKA_USERNAME"),
+		"sasl.password":      os.Getenv("KAFKA_PASSWORD"),
 		"session.timeout.ms": "45000",
 		"client.id":          "python-client-1",
 		"group.id":           GroupID,
