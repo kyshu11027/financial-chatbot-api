@@ -65,7 +65,7 @@ func SendChunkToClient(conversationID string, chunk string) {
 			delete(BufferedChunks, conversationID)
 			Mu.Unlock()
 			logger.Get().Info("Deleted conversation buffer because last message received",
-			zap.String("conversationID", conversationID))
+				zap.String("conversationID", conversationID))
 			return
 		}
 		// No client yet: buffer the chunk

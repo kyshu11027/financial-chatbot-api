@@ -134,13 +134,15 @@ func ExchangePublicToken(c *gin.Context) {
 			exchangeResponse.GetAccessToken(),
 			exchangeResponse.GetItemId(),
 		)
+
 		if err != nil {
 			logger.Get().Error("error creating new plaid item",
-				zap.String("user_id", claims.Sub),
-				zap.Error(err))
+			zap.String("user_id", claims.Sub),
+			zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		// Query transactions here and store in Qdrant as well as run a transactions/sync and store the cursor
 		logger.Get().Info("created new plaid item",
 			zap.String("item_id", exchangeResponse.GetItemId()),
 			zap.String("user_id", claims.Sub))
@@ -182,9 +184,9 @@ func GetTransactions(c *gin.Context) {
 		// 	zap.String("user_id", claims.Sub),
 		// 	zap.Error(err))
 		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
-    		body := plaidErr.Body()
-    		logger.Get().Error("plaid API error raw body", zap.String("body", string(body)))
-    		// existing error handling code here ...
+			body := plaidErr.Body()
+			logger.Get().Error("plaid API error raw body", zap.String("body", string(body)))
+			// existing error handling code here ...
 		}
 		return
 	}

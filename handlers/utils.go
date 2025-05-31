@@ -139,7 +139,7 @@ func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transa
 				Amount:        t.GetAmount(),
 				Name:          t.GetName(),
 				MerchantName:  t.GetMerchantName(),
-				Category:      t.GetCategory(),
+				Category:      t.GetPersonalFinanceCategory().Primary,
 				Pending:       t.GetPending(),
 			}
 			transactions = append(transactions, transaction)
