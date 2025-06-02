@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/kafka"
@@ -284,4 +285,62 @@ func authenticateSSE(c *gin.Context) error {
 		return err
 	}
 	return nil
+}
+
+func provisionSaveTransactionsJob(userId string, itemId string, accessToken string, cursor *string) error {
+	transactionsJob := &models.TransactionsJob{
+		UserID:      userId,
+		AccessToken: accessToken,
+		Cursor:      cursor,
+		ItemID:      itemId,
+	}
+
+	messageBytes, err := json.Marshal(transactionsJob)
+
+	if err != nil {
+		logger.Get().Error("failed to marshal transactions job request",
+			zap.String("user_id", userId),
+			zap.Error(err))
+		return fmt.Errorf("failed to marshal transactions job request: %w", err)
+	}
+
+	err = kafka.ProduceMessage(kafka.TransactionsJobTopic, messageBytes)
+
+	if err != nil {
+		logger.Get().Error("failed to produce transactions job request",
+			zap.String("user_id", userId),
+			zap.Error(err))
+		return fmt.Errorf("failed to produce transactions job request: %w", err)
+	}
+
+	err = db.UpdateSyncStatus(itemId, models.TransactionsJobInProgress)
+
+	if err != nil {
+		logger.Get().Error("failed to update sync status",
+			zap.String("user_id", userId),
+			zap.Error(err))
+		return fmt.Errorf("failed to update sync status: %w", err)
+	}
+
+	return nil
+}
+
+func needsSync(lastSyncedAt sql.NullTime, syncStatus models.SyncStatus) bool {
+
+	if syncStatus == models.TransactionsJobInProgress {
+		return false
+	}
+
+	if !lastSyncedAt.Valid {
+		// If null, assume sync is needed
+		return true
+	}
+
+	if syncStatus == models.TransactionsJobFailed {
+		return true
+	}
+
+	threeDaysAgo := time.Now().Add(-72 * time.Hour)
+	
+	return lastSyncedAt.Time.Before(threeDaysAgo)
 }

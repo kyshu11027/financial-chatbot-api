@@ -23,6 +23,10 @@ type ExchangeTokenRequest struct {
 	PublicToken string `json:"public_token" binding:"required"`
 }
 
+type ProvisionTransactionsJobRequest struct {
+	Items []models.PlaidItem `json:"items" binding:"required"`
+}
+
 func CreateLinkToken(c *gin.Context) {
 	var req CreateLinkTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -129,20 +133,31 @@ func ExchangePublicToken(c *gin.Context) {
 			zap.String("item_id", existingItem.ItemID),
 			zap.String("user_id", claims.Sub))
 	} else {
+		itemId := exchangeResponse.GetItemId()
+		accessToken := exchangeResponse.GetAccessToken()
 		_, err = db.CreatePlaidItem(
 			claims.Sub,
-			exchangeResponse.GetAccessToken(),
-			exchangeResponse.GetItemId(),
+			accessToken,
+			itemId,
 		)
 
 		if err != nil {
 			logger.Get().Error("error creating new plaid item",
-			zap.String("user_id", claims.Sub),
-			zap.Error(err))
+				zap.String("user_id", claims.Sub),
+				zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		// Query transactions here and store in Qdrant as well as run a transactions/sync and store the cursor
+		err = provisionSaveTransactionsJob(claims.Sub, itemId, accessToken, nil)
+
+		if err != nil {
+			logger.Get().Error("error provisioning transactions job",
+				zap.String("access_token", accessToken),
+				zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+
 		logger.Get().Info("created new plaid item",
 			zap.String("item_id", exchangeResponse.GetItemId()),
 			zap.String("user_id", claims.Sub))
@@ -180,13 +195,13 @@ func GetTransactions(c *gin.Context) {
 
 	transactions, err := getTransactions(c, items)
 	if err != nil {
-		// logger.Get().Error("error getting transactions",
-		// 	zap.String("user_id", claims.Sub),
-		// 	zap.Error(err))
 		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
 			body := plaidErr.Body()
 			logger.Get().Error("plaid API error raw body", zap.String("body", string(body)))
-			// existing error handling code here ...
+		} else {
+			logger.Get().Error("error getting transactions",
+				zap.String("user_id", claims.Sub),
+				zap.Error(err))
 		}
 		return
 	}
@@ -270,4 +285,47 @@ func GetItemsWithAccounts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"items": response})
+}
+
+func ProvisionTransactionsJob(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	var req ProvisionTransactionsJobRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Get().Error("error binding JSON", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	items := req.Items
+
+	for _, item := range items {
+		if needsSync(item.LastSyncedAt, item.SyncStatus) {
+			err := provisionSaveTransactionsJob(claims.Sub, item.ItemID, item.AccessToken, item.Cursor)
+
+			if err != nil {
+				logger.Get().Error("failed to produce transactions job request",
+					zap.String("access_token", item.AccessToken),
+					zap.Error(err))
+
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }

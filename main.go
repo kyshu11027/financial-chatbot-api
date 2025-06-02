@@ -88,6 +88,7 @@ func main() {
 		api.POST("/plaid/link-token/create", handlers.CreateLinkToken)
 		api.POST("/plaid/token/exchange", handlers.ExchangePublicToken)
 		api.POST("/plaid/transaction/list", handlers.GetTransactions)
+		api.POST("/plaid/transaction/save", handlers.ProvisionTransactionsJob)
 		api.POST("/plaid/account/list", handlers.GetItemsWithAccounts)
 		api.POST("/plaid/item/list", handlers.GetItems)
 		api.POST("/chat/conversation/new", handlers.HandleCreateNewConversation)

@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	MessageProducer *kafka.Producer
-	MessageTopic    string = "user_message"
-	ResponseTopic   string = "ai_response"
-	GroupID         string = "ai-response-consumer"
-	WorkerPool      *worker.WorkerPool
+	MessageProducer      *kafka.Producer
+	MessageTopic         string = "user_message"
+	TransactionsJobTopic string = "save_transactions"
+	ResponseTopic        string = "ai_response"
+	GroupID              string = "ai-response-consumer"
+	WorkerPool           *worker.WorkerPool
 )
 
 func InitProducer() error {

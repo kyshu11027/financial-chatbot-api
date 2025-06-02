@@ -33,13 +33,16 @@ type Balances struct {
 }
 
 type PlaidItem struct {
-	ID          string
-	UserID      string
-	AccessToken string
-	ItemID      string
-	Status      string
-	CreatedAt   sql.NullTime
-	UpdatedAt   sql.NullTime
+	ID           string       `json:"id"`
+	UserID       string       `json:"user_id"`
+	AccessToken  string       `json:"access_token"`
+	ItemID       string       `json:"item_id"`
+	Status       string       `json:"status"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+	LastSyncedAt sql.NullTime `json:"last_synced_at"`
+	SyncStatus   SyncStatus   `json:"sync_status"`
+	Cursor       *string      `json:"cursor"`
 }
 
 type PlaidError struct {
@@ -53,3 +56,19 @@ func (e *PlaidError) Error() string {
 	return fmt.Sprintf("Plaid API error: %s (type: %s, code: %s, request_id: %s)",
 		e.ErrorMessage, e.ErrorType, e.ErrorCode, e.RequestId)
 }
+
+type TransactionsJob struct {
+	UserID      string  `json:"user_id"`
+	AccessToken string  `json:"access_token"`
+	ItemID      string  `json:"item_id"`
+	Cursor      *string `json:"cursor"`
+}
+
+type SyncStatus string
+
+const (
+	TransactionsJobPending    SyncStatus = "pending"
+	TransactionsJobFailed     SyncStatus = "failed"
+	TransactionsJobInProgress SyncStatus = "in_progress"
+	TransactionsJobIdle       SyncStatus = "idle"
+)

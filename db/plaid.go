@@ -34,7 +34,7 @@ func CreatePlaidItem(userID, accessToken, itemID string) (*models.PlaidItem, err
 // GetPlaidItemsByUserID retrieves all Plaid items for a user
 func GetPlaidItemsByUserID(userID string) ([]*models.PlaidItem, error) {
 	query := `
-		SELECT id, user_id, access_token, item_id, status, created_at, updated_at
+		SELECT id, user_id, access_token, item_id, status, created_at, updated_at, last_synced_at, sync_status, transaction_cursor
 		FROM plaid_items
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -57,6 +57,9 @@ func GetPlaidItemsByUserID(userID string) ([]*models.PlaidItem, error) {
 			&item.Status,
 			&item.CreatedAt,
 			&item.UpdatedAt,
+			&item.LastSyncedAt,
+			&item.SyncStatus,
+			&item.Cursor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning Plaid item: %v", err)
@@ -99,7 +102,7 @@ func UpdatePlaidItemStatus(itemID, status string) error {
 // GetPlaidItemByItemID retrieves a Plaid item by its item_id
 func GetPlaidItemByItemID(itemID string) (*models.PlaidItem, error) {
 	query := `
-		SELECT id, user_id, access_token, item_id, status, created_at, updated_at
+		SELECT id, user_id, access_token, item_id, status, created_at, updated_at, last_synced_at, sync_status, transaction_cursor
 		FROM plaid_items
 		WHERE item_id = $1
 	`
@@ -113,7 +116,11 @@ func GetPlaidItemByItemID(itemID string) (*models.PlaidItem, error) {
 		&item.Status,
 		&item.CreatedAt,
 		&item.UpdatedAt,
+		&item.LastSyncedAt,
+		&item.SyncStatus,
+		&item.Cursor,
 	)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -122,4 +129,28 @@ func GetPlaidItemByItemID(itemID string) (*models.PlaidItem, error) {
 	}
 
 	return item, nil
+}
+
+func UpdateSyncStatus(itemID string, syncStatus models.SyncStatus) error {
+	query := `
+		UPDATE plaid_items
+        SET sync_status = $1
+        WHERE item_id = $2;
+	`
+	result, err := DB.Exec(query, syncStatus, itemID)
+
+	if err != nil {
+		return fmt.Errorf("error updating Plaid item status: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error getting rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no Plaid item found with ID: %s", itemID)
+	}
+
+	return nil
 }
