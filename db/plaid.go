@@ -10,7 +10,7 @@ import (
 func CreatePlaidItem(userID, accessToken, itemID string) (*models.PlaidItem, error) {
 	query := `
 		INSERT INTO plaid_items (user_id, access_token, item_id, status)
-		VALUES ($1, $2, $3, 'active')
+		VALUES ($1, $2, $3, 'HEALTHY')
 		RETURNING id, user_id, access_token, item_id, status, created_at, updated_at
 	`
 
@@ -134,11 +134,35 @@ func GetPlaidItemByItemID(itemID string) (*models.PlaidItem, error) {
 func UpdateSyncStatus(itemID string, syncStatus models.SyncStatus) error {
 	query := `
 		UPDATE plaid_items
-        SET sync_status = $1
+        SET sync_status = $1, updated_at = CURRENT_TIMESTAMP
         WHERE item_id = $2;
 	`
 	result, err := DB.Exec(query, syncStatus, itemID)
 
+	if err != nil {
+		return fmt.Errorf("error updating Plaid item status: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error getting rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no Plaid item found with ID: %s", itemID)
+	}
+
+	return nil
+}
+
+func UpdateItemStatus(itemID string, status string) error {
+	query := `
+		UPDATE plaid_items
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE item_id = $2
+	`
+
+	result, err := DB.Exec(query, status, itemID)
 	if err != nil {
 		return fmt.Errorf("error updating Plaid item status: %v", err)
 	}

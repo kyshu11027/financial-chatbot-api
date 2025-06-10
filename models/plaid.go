@@ -32,6 +32,12 @@ type Balances struct {
 	Limit           *float64 `json:"limit" bson:"limit"`
 }
 
+type GenericPlaidWebhook struct {
+	WebhookType string `json:"webhook_type"`
+	WebhookCode string `json:"webhook_code"`
+	ItemID      string `json:"item_id"`
+}
+
 type PlaidItem struct {
 	ID           string       `json:"id"`
 	UserID       string       `json:"user_id"`

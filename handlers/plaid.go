@@ -5,6 +5,7 @@ import (
 	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/plaid/plaid-go/v20/plaid"
@@ -44,6 +45,7 @@ func CreateLinkToken(c *gin.Context) {
 		},
 	)
 	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
+	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
 
 	logger.Get().Info("creating link token",
 		zap.String("user_id", req.UserID),
@@ -328,4 +330,49 @@ func ProvisionTransactionsJob(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func HandlePlaidWebhook(c *gin.Context) {
+	logger.Get().Info("Received Plaid webhook")
+
+	var webhook models.GenericPlaidWebhook
+	if err := c.ShouldBindJSON(&webhook); err != nil {
+		logger.Get().Error("error parsing generic webhook", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook payload"})
+		return
+	}
+
+	logger.Get().Info("Parsed Plaid webhook",
+		zap.String("webhook_type", webhook.WebhookType),
+		zap.String("webhook_code", webhook.WebhookCode),
+		zap.String("webhook_item_id", webhook.ItemID),
+	)
+
+	switch webhook.WebhookType {
+	case "ITEM":
+		switch webhook.WebhookCode {
+		case "ERROR":
+			if err := db.UpdateItemStatus(webhook.ItemID, "ERROR"); err != nil {
+				logger.Get().Error("failed to update item status to ERROR", zap.Error(err))
+			} else {
+				logger.Get().Info("Updated item status to ERROR", zap.String("item_id", webhook.ItemID))
+			}
+
+		case "LOGIN_REPAIRED":
+			logger.Get().Info("Item login repaired", zap.String("item_id", webhook.ItemID))
+
+			if err := db.UpdateItemStatus(webhook.ItemID, "ACTIVE"); err != nil {
+				logger.Get().Error("failed to update item status to ACTIVE", zap.Error(err))
+			} else {
+				logger.Get().Info("Updated item status to ACTIVE", zap.String("item_id", webhook.ItemID))
+			}
+		default:
+			logger.Get().Info("Unhandled ITEM webhook code", zap.String("webhook_code", webhook.WebhookCode))
+		}
+	default:
+		logger.Get().Info("Unhandled webhook type", zap.String("webhook_type", webhook.WebhookType))
+	}
+
+	logger.Get().Info("Plaid webhook processed successfully")
+	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }

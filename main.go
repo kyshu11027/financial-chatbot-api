@@ -102,6 +102,15 @@ func main() {
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
 	}
+
+	// Webhook routes
+	webhook := router.Group("/webhook")
+	{
+		webhook.Use(middleware.PlaidWebhookVerifier)
+		webhook.POST("/plaid", handlers.HandlePlaidWebhook)
+	}
+
+	// Public routes
 	router.GET("/sse/:conversationID", handlers.HandleSSE)
 	router.GET("/metrics", func(c *gin.Context) {
 		kafka.WorkerPool.MetricsHandler(c.Writer, c.Request)
