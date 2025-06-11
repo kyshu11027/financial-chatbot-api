@@ -86,11 +86,13 @@ func main() {
 		api.Use(middleware.AuthMiddleware)
 		// Plaid routes
 		api.POST("/plaid/link-token/create", handlers.CreateLinkToken)
+		api.POST("/plaid/link-token/update", handlers.CreateUpdateLinkToken)
 		api.POST("/plaid/token/exchange", handlers.ExchangePublicToken)
 		api.POST("/plaid/transaction/list", handlers.GetTransactions)
 		api.POST("/plaid/transaction/save", handlers.ProvisionTransactionsJob)
 		api.POST("/plaid/account/list", handlers.GetItemsWithAccounts)
 		api.POST("/plaid/item/list", handlers.GetItems)
+		api.POST("/plaid/item/update", handlers.HandleSuccessfulPlaidItemUpdate)
 		api.POST("/chat/conversation/new", handlers.HandleCreateNewConversation)
 		api.POST("/chat/conversation/list", handlers.HandleGetConversations)
 		api.POST("/chat/conversation/update", handlers.HandleUpdateConversation)

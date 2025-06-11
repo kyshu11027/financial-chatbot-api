@@ -341,6 +341,6 @@ func needsSync(lastSyncedAt sql.NullTime, syncStatus models.SyncStatus) bool {
 	}
 
 	threeDaysAgo := time.Now().Add(-72 * time.Hour)
-	
+
 	return lastSyncedAt.Time.Before(threeDaysAgo)
 }

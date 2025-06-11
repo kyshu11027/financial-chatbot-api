@@ -78,3 +78,10 @@ const (
 	TransactionsJobInProgress SyncStatus = "in_progress"
 	TransactionsJobIdle       SyncStatus = "idle"
 )
+
+type ItemStatus string
+
+const (
+	ItemStatusHealthy ItemStatus = "HEALTHY"
+	ItemStatusError   ItemStatus = "ERROR"
+)

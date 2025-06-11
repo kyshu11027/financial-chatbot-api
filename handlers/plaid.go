@@ -16,10 +16,9 @@ var (
 	PlaidClient *plaid.APIClient
 )
 
-type CreateLinkTokenRequest struct {
-	UserID string `json:"user_id" binding:"required"`
+type CreateUpdateLinkTokenRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
 }
-
 type ExchangeTokenRequest struct {
 	PublicToken string `json:"public_token" binding:"required"`
 }
@@ -28,11 +27,22 @@ type ProvisionTransactionsJobRequest struct {
 	Items []models.PlaidItem `json:"items" binding:"required"`
 }
 
+type HandleSuccessfulPlaidItemUpdateRequest struct {
+	ItemID string `json:"item_id" binding:"required"`
+}
+
 func CreateLinkToken(c *gin.Context) {
-	var req CreateLinkTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Get().Error("error binding JSON", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
 		return
 	}
 
@@ -41,14 +51,14 @@ func CreateLinkToken(c *gin.Context) {
 		"en",
 		[]plaid.CountryCode{plaid.COUNTRYCODE_US},
 		plaid.LinkTokenCreateRequestUser{
-			ClientUserId: req.UserID,
+			ClientUserId: claims.Sub,
 		},
 	)
 	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
 	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
 
 	logger.Get().Info("creating link token",
-		zap.String("user_id", req.UserID),
+		zap.String("user_id", claims.Sub),
 		zap.Any("request", linkTokenRequest))
 
 	linkToken, _, err := PlaidClient.PlaidApi.LinkTokenCreate(c.Request.Context()).LinkTokenCreateRequest(*linkTokenRequest).Execute()
@@ -69,8 +79,69 @@ func CreateLinkToken(c *gin.Context) {
 	}
 
 	logger.Get().Info("link token created successfully",
-		zap.String("user_id", req.UserID))
+		zap.String("user_id", claims.Sub))
 	c.JSON(http.StatusOK, gin.H{"link_token": linkToken.GetLinkToken()})
+}
+
+func CreateUpdateLinkToken(c *gin.Context) {
+	var req CreateUpdateLinkTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Get().Error("error binding JSON", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	linkTokenRequest := plaid.NewLinkTokenCreateRequest(
+		"Finance Chatbot",
+		"en",
+		[]plaid.CountryCode{plaid.COUNTRYCODE_US},
+		plaid.LinkTokenCreateRequestUser{
+			ClientUserId: claims.Sub,
+		},
+	)
+	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
+	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
+	linkTokenRequest.SetAccessToken(req.AccessToken)
+
+	logger.Get().Info("creating link token",
+		zap.String("user_id", claims.Sub),
+		zap.Any("request", linkTokenRequest))
+
+	linkToken, _, err := PlaidClient.PlaidApi.LinkTokenCreate(c.Request.Context()).LinkTokenCreateRequest(*linkTokenRequest).Execute()
+	if err != nil {
+		if plaidErr, ok := err.(*plaid.GenericOpenAPIError); ok {
+			logger.Get().Error("plaid error",
+				zap.String("error_body", string(plaidErr.Body())),
+				zap.Error(plaidErr))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": plaidErr.Error(),
+				"body":  string(plaidErr.Body()),
+			})
+		} else {
+			logger.Get().Error("error creating link token", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	logger.Get().Info("link token created successfully",
+		zap.String("user_id", claims.Sub))
+	c.JSON(http.StatusOK, gin.H{"link_token": linkToken.GetLinkToken()})
+
 }
 
 func ExchangePublicToken(c *gin.Context) {
@@ -352,7 +423,7 @@ func HandlePlaidWebhook(c *gin.Context) {
 	case "ITEM":
 		switch webhook.WebhookCode {
 		case "ERROR":
-			if err := db.UpdateItemStatus(webhook.ItemID, "ERROR"); err != nil {
+			if err := db.UpdateItemStatus(webhook.ItemID, models.ItemStatusError); err != nil {
 				logger.Get().Error("failed to update item status to ERROR", zap.Error(err))
 			} else {
 				logger.Get().Info("Updated item status to ERROR", zap.String("item_id", webhook.ItemID))
@@ -361,10 +432,10 @@ func HandlePlaidWebhook(c *gin.Context) {
 		case "LOGIN_REPAIRED":
 			logger.Get().Info("Item login repaired", zap.String("item_id", webhook.ItemID))
 
-			if err := db.UpdateItemStatus(webhook.ItemID, "ACTIVE"); err != nil {
-				logger.Get().Error("failed to update item status to ACTIVE", zap.Error(err))
+			if err := db.UpdateItemStatus(webhook.ItemID, models.ItemStatusHealthy); err != nil {
+				logger.Get().Error("failed to update item status to HEALTHY", zap.Error(err))
 			} else {
-				logger.Get().Info("Updated item status to ACTIVE", zap.String("item_id", webhook.ItemID))
+				logger.Get().Info("Updated item status to HEALTHY", zap.String("item_id", webhook.ItemID))
 			}
 		default:
 			logger.Get().Info("Unhandled ITEM webhook code", zap.String("webhook_code", webhook.WebhookCode))
@@ -375,4 +446,25 @@ func HandlePlaidWebhook(c *gin.Context) {
 
 	logger.Get().Info("Plaid webhook processed successfully")
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
+}
+
+func HandleSuccessfulPlaidItemUpdate(c *gin.Context) {
+	var req HandleSuccessfulPlaidItemUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Get().Error("error binding JSON", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger.Get().Info("Item login repaired", zap.String("item_id", req.ItemID))
+
+	if err := db.UpdateItemStatus(req.ItemID, models.ItemStatusHealthy); err != nil {
+		logger.Get().Error("failed to update item status to HEALTHY", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger.Get().Info("Updated item status to HEALTHY", zap.String("item_id", req.ItemID))
+
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
 }

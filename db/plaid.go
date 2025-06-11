@@ -155,7 +155,7 @@ func UpdateSyncStatus(itemID string, syncStatus models.SyncStatus) error {
 	return nil
 }
 
-func UpdateItemStatus(itemID string, status string) error {
+func UpdateItemStatus(itemID string, status models.ItemStatus) error {
 	query := `
 		UPDATE plaid_items
 		SET status = $1, updated_at = CURRENT_TIMESTAMP
