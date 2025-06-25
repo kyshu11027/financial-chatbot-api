@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/plaid/plaid-go/v20/plaid"
+	"github.com/stripe/stripe-go/v82"
 	"go.uber.org/zap"
 )
 
@@ -40,6 +41,10 @@ func init() {
 	configuration.AddDefaultHeader("PLAID-SECRET", os.Getenv("PLAID_SECRET"))
 	configuration.UseEnvironment(plaid.Sandbox) // Change to Development or Production as needed
 	handlers.PlaidClient = plaid.NewAPIClient(configuration)
+
+	// Initialize Stripe client
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+
 }
 
 func main() {
@@ -103,6 +108,7 @@ func main() {
 		api.POST("/user-info/update", handlers.UpdateUserInfo)
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
+		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
 	}
 
 	// Webhook routes
