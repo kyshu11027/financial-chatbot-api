@@ -52,16 +52,17 @@ func main() {
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"}) // Only trust local proxies
 
 	// CORS middleware
-	router.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	// router.Use(func(c *gin.Context) {
+	// 	c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	// 	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	// 	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	// 	if c.Request.Method == "OPTIONS" {
+	// 		c.AbortWithStatus(204)
+	// 		return
+	// 	}
+	// 	c.Next()
+	// })
+	router.Use(middleware.CorsMiddleware)
 
 	// Initialize databases
 	if err := db.InitDB(); err != nil {

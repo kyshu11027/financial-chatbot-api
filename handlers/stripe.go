@@ -13,7 +13,7 @@ import (
 
 
 var (
-	successURL = "http://localhost:3000/session_id={CHECKOUT_SESSION_ID}"
+	successURL = "http://localhost:3000/"
 	cancelURL  = "http://localhost:3000/canceled.html"
 )
 
@@ -28,6 +28,9 @@ func HandleCreateStripeSession(c *gin.Context) {
 				Price:    stripe.String(os.Getenv("STRIPE_PRICE_ID")),
 				Quantity: stripe.Int64(1),
 			},
+		},
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+			TrialPeriodDays: stripe.Int64(1),
 		},
 	}
 
@@ -55,16 +58,19 @@ func HandleStripeWebhook(c *gin.Context) {
 	switch event.Type {
 	case "checkout.session.completed":
 		log.Printf("Checkout webhook received: %s", event.Type)
+		// Update DB to save the customer_id
+
+	case "customer.subscription.created":
+		log.Printf("Customer subscription created webhook received: %s", event.Type)
+		// Update DB to reflect subscription status is trialing.
+		
 	case "invoice.paid":
 		log.Printf("Invoice paid webhook received: %s", event.Type)
-		// Continue to provision the subscription as payments continue to be made.
-		// Store the status in your database and check when a user accesses your service.
-		// This approach helps you avoid hitting rate limits.
+		// Update DB to reflect subscription status is active.
+
 	case "invoice.payment_failed":
 		log.Printf("Invoice payment failed webhook received: %s", event.Type)
-		// The payment failed or the customer does not have a valid payment method.
-		// The subscription becomes past_due. Notify your customer and send them to the
-		// customer portal to update their payment information.
+		// Update DB to reflect subscription status is inactive.
 	default:
 		log.Printf("Unhandled event type: %s", event.Type)
 		// unhandled event type
