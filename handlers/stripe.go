@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"io"
+	"finance-chatbot/api/middleware"
 	"log"
 	"net/http"
 	"os"
@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
-	"github.com/stripe/stripe-go/v82/webhook"
 )
 
 
@@ -39,22 +38,17 @@ func HandleCreateStripeSession(c *gin.Context) {
 	})
 }
 
-func HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("io.ReadAll: %v", err)
+// func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+func HandleStripeWebhook(c *gin.Context) {
+	eventRaw, exists := c.Get(middleware.StripeEventKey)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Missing Stripe event in context"})
 		return
 	}
 
-	event, err := webhook.ConstructEvent(b, r.Header.Get("Stripe-Signature"), "{{STRIPE_WEBHOOK_SECRET}}")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("webhook.ConstructEvent: %v", err)
+	event, ok := eventRaw.(stripe.Event)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid event type"})
 		return
 	}
 

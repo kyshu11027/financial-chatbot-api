@@ -11,11 +11,13 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
+const (
 	ContextCollection  string = "contexts"
 	MessageCollection  string = "messages"
 	UserInfoCollection string = "user_info"
 	MongoDatabase      string = "conversations"
+)
+var(
 	MongoClient        *mongo.Client
 )
 

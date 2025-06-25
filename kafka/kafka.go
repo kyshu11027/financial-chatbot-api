@@ -9,13 +9,15 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	MessageProducer      *kafka.Producer
+const (
 	MessageTopic         string = "user_message"
 	TransactionsJobTopic string = "save_transactions"
-	ResponseTopic        string = "ai_response"
 	GroupID              string = "ai-response-consumer"
+)
+var (
+	MessageProducer      *kafka.Producer
 	WorkerPool           *worker.WorkerPool
+	ResponseTopic        string = "ai_response" // THIS IS A CONSTANT NEVER CHANGE IT
 )
 
 func InitProducer() error {

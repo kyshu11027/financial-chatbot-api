@@ -110,12 +110,12 @@ func main() {
 		api.POST("/user-info/get", handlers.GetUserInfo)
 		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
 	}
-
+	
 	// Webhook routes
 	webhook := router.Group("/webhook")
 	{
-		webhook.Use(middleware.PlaidWebhookVerifier)
-		webhook.POST("/plaid", handlers.HandlePlaidWebhook)
+		webhook.POST("/stripe", middleware.StripeWebhookVerifier, handlers.HandleStripeWebhook)
+		webhook.POST("/plaid", middleware.PlaidWebhookVerifier,handlers.HandlePlaidWebhook)
 	}
 
 	// Public routes
