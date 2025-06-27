@@ -88,7 +88,7 @@ func HandleCreateStripeSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Stripe ID in database"})
 		return
 	}
-
+	
 	c.JSON(http.StatusOK, gin.H{
 		"url": s.URL,
 	})
@@ -168,4 +168,28 @@ func HandleStripeWebhook(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func HandleGetUser(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	user_info, err := db.GetUserByID(claims.Sub)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user_info)
 }

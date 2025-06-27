@@ -98,6 +98,7 @@ func main() {
 		api.POST("/user-info/update", handlers.UpdateUserInfo)
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
+		api.POST("/user/get", handlers.HandleGetUser)
 		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
 	}
 
