@@ -17,8 +17,9 @@ const (
 	UserInfoCollection string = "user_info"
 	MongoDatabase      string = "conversations"
 )
-var(
-	MongoClient        *mongo.Client
+
+var (
+	MongoClient *mongo.Client
 )
 
 func InitMongoDB() error {

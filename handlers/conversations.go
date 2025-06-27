@@ -173,7 +173,7 @@ func HandleUpdateConversation(c *gin.Context) {
 		return
 	}
 
-	updatedConversation, err := db.Update(req.ConversationID, req.Title)
+	updatedConversation, err := db.UpdateConversation(req.ConversationID, req.Title)
 	if err != nil {
 		logger.Get().Error("error updating conversation",
 			zap.String("conversation_id", req.ConversationID),
@@ -231,7 +231,7 @@ func HandleDeleteConversation(c *gin.Context) {
 		return
 	}
 
-	err = db.Delete(req.ConversationID)
+	err = db.DeleteConversation(req.ConversationID)
 	if err != nil {
 		logger.Get().Error("error deleting conversation from Postgres",
 			zap.String("conversation_id", req.ConversationID),

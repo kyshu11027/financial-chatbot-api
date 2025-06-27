@@ -32,14 +32,6 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		return nil, err
 	}
 
-	transactions, err := getTransactions(c, items)
-	if err != nil {
-		logger.Get().Error("error getting transactions",
-			zap.String("user_id", userID),
-			zap.Error(err))
-		return nil, err
-	}
-
 	accounts, err := getAccounts(c, items)
 	if err != nil {
 		logger.Get().Error("error getting accounts",
@@ -60,7 +52,6 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		ConversationID:     conversationID,
 		UserID:             userID,
 		CreatedAt:          time.Now().Unix(),
-		Transactions:       transactions,
 		Accounts:           accounts,
 		Income:             userInfo.Income,
 		SavingsGoal:        userInfo.SavingsGoal,

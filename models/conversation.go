@@ -7,15 +7,14 @@ import (
 )
 
 type Context struct {
-	ConversationID     string        `json:"conversation_id" bson:"conversation_id"`
-	UserID             string        `json:"user_id" bson:"user_id"`
-	Name               string        `json:"name" bson:"name"`
-	CreatedAt          int64         `json:"created_at" bson:"created_at"`
-	Income             float64       `json:"income" bson:"income"`
-	SavingsGoal        float64       `json:"savings_goal" bson:"savings_goal"`
-	Transactions       []Transaction `json:"transactions" bson:"transactions"`
-	AdditionalExpenses []Expense     `json:"additional_monthly_expenses" bson:"additional_monthly_expenses"`
-	Accounts           []Account     `json:"accounts" bson:"accounts"`
+	ConversationID     string    `json:"conversation_id" bson:"conversation_id"`
+	UserID             string    `json:"user_id" bson:"user_id"`
+	Name               string    `json:"name" bson:"name"`
+	CreatedAt          int64     `json:"created_at" bson:"created_at"`
+	Income             float64   `json:"income" bson:"income"`
+	SavingsGoal        float64   `json:"savings_goal" bson:"savings_goal"`
+	AdditionalExpenses []Expense `json:"additional_monthly_expenses" bson:"additional_monthly_expenses"`
+	Accounts           []Account `json:"accounts" bson:"accounts"`
 }
 
 type Message struct {

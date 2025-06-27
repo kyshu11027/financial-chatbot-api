@@ -56,19 +56,6 @@ func GetByID(id string) (*models.Conversation, error) {
 	return item, nil
 }
 
-func Delete(id string) error {
-	query := `
-		DELETE FROM conversations
-		WHERE id = $1
-	`
-	_, err := DB.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func GetAllByUserID(userID string) ([]*models.Conversation, error) {
 	query := `
 		SELECT id, user_id, created_at, title
@@ -101,7 +88,7 @@ func GetAllByUserID(userID string) ([]*models.Conversation, error) {
 	return items, nil
 }
 
-func Update(id string, title string) (*models.Conversation, error) {
+func UpdateConversation(id string, title string) (*models.Conversation, error) {
 	query := `
 		UPDATE conversations
 		SET title = $1

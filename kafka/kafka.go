@@ -14,10 +14,11 @@ const (
 	TransactionsJobTopic string = "save_transactions"
 	GroupID              string = "ai-response-consumer"
 )
+
 var (
-	MessageProducer      *kafka.Producer
-	WorkerPool           *worker.WorkerPool
-	ResponseTopic        string = "ai_response" // THIS IS A CONSTANT NEVER CHANGE IT
+	MessageProducer *kafka.Producer
+	WorkerPool      *worker.WorkerPool
+	ResponseTopic   string = "ai_response" // THIS IS A CONSTANT NEVER CHANGE IT
 )
 
 func InitProducer() error {

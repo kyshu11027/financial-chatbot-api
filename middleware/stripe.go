@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v82/webhook"
 )
+
 const StripeEventKey = "stripe_event"
 
 func StripeWebhookVerifier(c *gin.Context) {

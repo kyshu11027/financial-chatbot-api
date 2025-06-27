@@ -1,16 +1,20 @@
 package handlers
 
 import (
+	"encoding/json"
+	"finance-chatbot/api/db"
+	"finance-chatbot/api/logger"
 	"finance-chatbot/api/middleware"
-	"log"
+	"finance-chatbot/api/models"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
+	"github.com/stripe/stripe-go/v82/customer"
+	"go.uber.org/zap"
 )
-
 
 var (
 	successURL = "http://localhost:3000/"
@@ -18,8 +22,47 @@ var (
 )
 
 func HandleCreateStripeSession(c *gin.Context) {
-	log.Printf("Price ID: %s", os.Getenv("STRIPE_PRICE_ID"))
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	userInfo, err := db.GetUserByID(claims.Sub)
+	logger.Get().Debug("User info retrieved", zap.String("user_id", claims.Sub), zap.Any("user_info", userInfo))
+	if err != nil {
+		logger.Get().Error("Failed to get user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check email existence"})
+		return
+	}
+
+	subscriptionData := &stripe.CheckoutSessionSubscriptionDataParams{}
+	if !userInfo.HasUsedTrial {
+		logger.Get().Debug("User has used free trial, removing trial period")
+		subscriptionData.TrialPeriodDays = stripe.Int64(1)
+	}
+
+	customerParams := &stripe.CustomerParams{
+		Email: stripe.String(claims.Email),
+	}
+
+	cust, err := customer.New(customerParams)
+	if err != nil {
+		logger.Get().Error("Failed to create Stripe customer", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Stripe customer"})
+		return
+	}
+
 	params := &stripe.CheckoutSessionParams{
+		Customer: stripe.String(cust.ID),
 		SuccessURL: &successURL,
 		CancelURL:  &cancelURL,
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
@@ -29,12 +72,22 @@ func HandleCreateStripeSession(c *gin.Context) {
 				Quantity: stripe.Int64(1),
 			},
 		},
-		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
-			TrialPeriodDays: stripe.Int64(1),
-		},
+		SubscriptionData: subscriptionData,
 	}
 
-	s, _ := session.New(params)
+	s, err := session.New(params)
+
+	if err != nil {
+		logger.Get().Error("Failed to create Stripe session", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Stripe session creation failed"})
+		return
+	}
+
+	if err := db.UpdateStripeIDByUserID(claims.Sub, cust.ID); err != nil {
+		logger.Get().Error("Failed to update Stripe ID in database", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Stripe ID in database"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"url": s.URL,
@@ -55,24 +108,64 @@ func HandleStripeWebhook(c *gin.Context) {
 		return
 	}
 
+	var stripeID string
+
 	switch event.Type {
 	case "checkout.session.completed":
-		log.Printf("Checkout webhook received: %s", event.Type)
-		// Update DB to save the customer_id
+		logger.Get().Info("Checkout session completed", zap.String("event_id", event.ID))
+		var session stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			logger.Get().Error("Error parsing session", zap.Error(err))
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		stripeID = session.Customer.ID
+		logger.Get().Debug("User IDs", zap.String("stripe_id", stripeID))
+		if err := db.UpdateTrialStatusByStripeID(stripeID, true); err != nil {
+			logger.Get().Error("Error updating Stripe ID", zap.Error(err))
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 
 	case "customer.subscription.created":
-		log.Printf("Customer subscription created webhook received: %s", event.Type)
-		// Update DB to reflect subscription status is trialing.
-		
-	case "invoice.paid":
-		log.Printf("Invoice paid webhook received: %s", event.Type)
-		// Update DB to reflect subscription status is active.
+		logger.Get().Info("Customer subscription created", zap.String("event_type", string(event.Type)), zap.String("event_id", event.ID))
+		var subscription stripe.Subscription
+		if err := json.Unmarshal(event.Data.Raw, &subscription); err != nil {
+			logger.Get().Error("Error parsing subscription", zap.Error(err))
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		stripeID = subscription.Customer.ID
+		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusTrial); err != nil {
+			logger.Get().Error("Error updating user status", zap.Error(err))
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 
-	case "invoice.payment_failed":
-		log.Printf("Invoice payment failed webhook received: %s", event.Type)
-		// Update DB to reflect subscription status is inactive.
+	case "invoice.paid", "invoice.payment_failed":
+		logger.Get().Info("Invoice event received", zap.String("event_type", string(event.Type)), zap.String("event_id", event.ID))
+		var invoice stripe.Invoice
+		if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
+			logger.Get().Error("Error parsing invoice", zap.Error(err))
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		stripeID = invoice.Customer.ID
+
+		status := models.UserStatusActive
+		if event.Type == "invoice.payment_failed" {
+			status = models.UserStatusInactive
+		}
+
+		if err := db.UpdateStatusByStripeID(stripeID, status); err != nil {
+			logger.Get().Error("Error updating user status", zap.Error(err))
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
 	default:
-		log.Printf("Unhandled event type: %s", event.Type)
-		// unhandled event type
+		logger.Get().Info("Unhandled event type", zap.String("event_type", string(event.Type)))
 	}
+
+	c.Status(http.StatusOK)
 }

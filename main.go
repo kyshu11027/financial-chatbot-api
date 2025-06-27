@@ -49,19 +49,8 @@ func init() {
 
 func main() {
 	router := gin.Default()
-	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"}) // Only trust local proxies
+	// router.SetTrustedProxies([]string{"127.0.0.1", "localhost"}) // May have to update to Cloudflare IPs https://www.cloudflare.com/ips/
 
-	// CORS middleware
-	// router.Use(func(c *gin.Context) {
-	// 	c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-	// 	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	// 	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	// 	if c.Request.Method == "OPTIONS" {
-	// 		c.AbortWithStatus(204)
-	// 		return
-	// 	}
-	// 	c.Next()
-	// })
 	router.Use(middleware.CorsMiddleware)
 
 	// Initialize databases
@@ -111,12 +100,12 @@ func main() {
 		api.POST("/user-info/get", handlers.GetUserInfo)
 		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
 	}
-	
+
 	// Webhook routes
 	webhook := router.Group("/webhook")
 	{
 		webhook.POST("/stripe", middleware.StripeWebhookVerifier, handlers.HandleStripeWebhook)
-		webhook.POST("/plaid", middleware.PlaidWebhookVerifier,handlers.HandlePlaidWebhook)
+		webhook.POST("/plaid", middleware.PlaidWebhookVerifier, handlers.HandlePlaidWebhook)
 	}
 
 	// Public routes
