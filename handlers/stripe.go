@@ -16,10 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	successURL = "http://localhost:3000/"
-	cancelURL  = "http://localhost:3000/canceled.html"
-)
+const url = "http://localhost:3000/"
 
 func HandleCreateStripeSession(c *gin.Context) {
 	user, exists := c.Get("user")
@@ -63,8 +60,8 @@ func HandleCreateStripeSession(c *gin.Context) {
 
 	params := &stripe.CheckoutSessionParams{
 		Customer: stripe.String(cust.ID),
-		SuccessURL: &successURL,
-		CancelURL:  &cancelURL,
+		SuccessURL: stripe.String(string(os.Getenv("CLIENT_URL"))),
+		CancelURL:  stripe.String(string(os.Getenv("CLIENT_URL"))),
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
@@ -88,7 +85,7 @@ func HandleCreateStripeSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Stripe ID in database"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"url": s.URL,
 	})
