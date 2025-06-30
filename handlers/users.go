@@ -26,7 +26,13 @@ func HandleDeleteUser(c *gin.Context) {
 		return
 	}
 
-	err := mongodb.DeleteContextsByUserID(c, claims.Sub)
+	err := db.DeletePlaidItemsByUserID(claims.Sub)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting plaid items"})
+	}
+
+	err = mongodb.DeleteContextsByUserID(c, claims.Sub)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting user conversation contexts"})

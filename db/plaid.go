@@ -74,6 +74,20 @@ func GetPlaidItemsByUserID(userID string) ([]*models.PlaidItem, error) {
 	return items, nil
 }
 
+func DeletePlaidItemsByUserID(userId string) error {
+	query := `
+		DELETE FROM plaid_items
+		WHERE user_id = $1
+	`
+
+	_, err := DB.Exec(query, userId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // UpdatePlaidItemStatus updates the status of a Plaid item
 func UpdatePlaidItemStatus(itemID, status string) error {
 	query := `
