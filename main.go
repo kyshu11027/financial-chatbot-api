@@ -7,6 +7,7 @@ import (
 	"finance-chatbot/api/logger"
 	"finance-chatbot/api/middleware"
 	"finance-chatbot/api/mongodb"
+	"finance-chatbot/api/qdrant"
 	"flag"
 	"os"
 	"os/signal"
@@ -64,6 +65,11 @@ func main() {
 	}
 	defer mongodb.CloseMongoDB()
 
+	if err := qdrant.InitQdrantClient(); err != nil {
+		logger.Get().Fatal("Failed to initialize Qdrant", zap.Error(err))
+	}
+	defer qdrant.CloseQdrantClient()
+
 	if err := kafka.InitProducer(); err != nil {
 		logger.Get().Fatal("Failed to initialize Kafka producer", zap.Error(err))
 	}
@@ -100,6 +106,7 @@ func main() {
 		api.POST("/user-info/get", handlers.GetUserInfo)
 		api.POST("/user/get", handlers.HandleGetUser)
 		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
+		api.POST("/stripe/subscription/delete", handlers.HandleDeleteSubscription)
 	}
 
 	// Webhook routes

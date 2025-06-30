@@ -55,3 +55,12 @@ func DeleteMessages(ctx context.Context, conversationID string) error {
 	}
 	return nil
 }
+
+func DeleteMessagesByUserID(ctx context.Context, userId string) error {
+	collection := MongoClient.Database(MongoDatabase).Collection(MessageCollection)
+	_, err := collection.DeleteMany(ctx, map[string]string{"user_id": userId})
+	if err != nil {
+		return fmt.Errorf("error deleting messages: %v", err)
+	}
+	return nil
+}

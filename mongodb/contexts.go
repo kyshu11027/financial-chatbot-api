@@ -40,3 +40,15 @@ func DeleteConversation(ctx context.Context, conversationID string) error {
 	}
 	return nil
 }
+
+func DeleteContextsByUserID(ctx context.Context, userID string) error {
+	collection := MongoClient.Database(MongoDatabase).Collection(ContextCollection)
+
+	filter := map[string]any{"user_id": userID}
+	_, err := collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("error deleting conversations for user_id %s: %v", userID, err)
+	}
+
+	return nil
+}

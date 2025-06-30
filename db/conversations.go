@@ -109,3 +109,17 @@ func UpdateConversation(id string, title string) (*models.Conversation, error) {
 
 	return item, nil
 }
+
+func DeleteConversationsByUserID(userId string) error {
+	query := `
+		DELETE FROM conversations
+		WHERE user_id = $1
+	`
+
+	_, err := DB.Exec(query, userId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

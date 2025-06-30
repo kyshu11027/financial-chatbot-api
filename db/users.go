@@ -45,13 +45,25 @@ func UpdateTrialStatusByStripeID(stripeID string, hasUsedTrial bool) error {
 	return nil
 }
 
-func UpdateStatusByStripeID(stripeID string, status models.UserStatus) error {
-	query := `
-		UPDATE users
-		SET status = $1
-		WHERE stripe_id = $2
-	`
-	_, err := DB.Exec(query, status, stripeID)
+func UpdateStatusByStripeID(stripeID string, status models.UserStatus, subscriptionID *string) error {
+
+	var err error
+	if subscriptionID == nil {
+		query := `
+			UPDATE users
+			SET status = $1
+			WHERE stripe_id = $2
+		`
+		_, err = DB.Exec(query, status, stripeID)
+	} else {
+		query := `
+			UPDATE users
+			SET status = $1, subscription_id = $2
+			WHERE stripe_id = $3
+		`
+		_, err = DB.Exec(query, status, *subscriptionID, stripeID)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error updating status for Stripe ID %s: %v", stripeID, err)
 	}
@@ -60,13 +72,13 @@ func UpdateStatusByStripeID(stripeID string, status models.UserStatus) error {
 
 func GetUserByID(userID string) (*models.User, error) {
 	query := `
-		SELECT id, stripe_id, status, email, has_used_trial
+		SELECT id, stripe_id, status, email, has_used_trial, subscription_id
 		FROM users
 		WHERE id = $1
 	`
 	row := DB.QueryRow(query, userID)
 	user := &models.User{}
-	err := row.Scan(&user.UserID, &user.StripeID, &user.Status, &user.Email, &user.HasUsedTrial)
+	err := row.Scan(&user.UserID, &user.StripeID, &user.Status, &user.Email, &user.HasUsedTrial, &user.SubscriptionID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found: %s", userID)

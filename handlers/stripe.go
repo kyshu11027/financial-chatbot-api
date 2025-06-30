@@ -13,10 +13,9 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/customer"
+	"github.com/stripe/stripe-go/v82/subscription"
 	"go.uber.org/zap"
 )
-
-const url = "http://localhost:3000/"
 
 func HandleCreateStripeSession(c *gin.Context) {
 	user, exists := c.Get("user")
@@ -59,7 +58,7 @@ func HandleCreateStripeSession(c *gin.Context) {
 	}
 
 	params := &stripe.CheckoutSessionParams{
-		Customer: stripe.String(cust.ID),
+		Customer:   stripe.String(cust.ID),
 		SuccessURL: stripe.String(string(os.Getenv("CLIENT_URL"))),
 		CancelURL:  stripe.String(string(os.Getenv("CLIENT_URL"))),
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
@@ -133,7 +132,7 @@ func HandleStripeWebhook(c *gin.Context) {
 			return
 		}
 		stripeID = subscription.Customer.ID
-		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusTrial); err != nil {
+		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusTrial, &subscription.ID); err != nil {
 			logger.Get().Error("Error updating user status", zap.Error(err))
 			c.Status(http.StatusInternalServerError)
 			return
@@ -154,7 +153,14 @@ func HandleStripeWebhook(c *gin.Context) {
 			status = models.UserStatusInactive
 		}
 
-		if err := db.UpdateStatusByStripeID(stripeID, status); err != nil {
+		if err := db.UpdateStatusByStripeID(stripeID, status, nil); err != nil {
+			logger.Get().Error("Error updating user status", zap.Error(err))
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+	case "customer.subscription.deleted":
+		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusInactive, nil); err != nil {
 			logger.Get().Error("Error updating user status", zap.Error(err))
 			c.Status(http.StatusInternalServerError)
 			return
@@ -189,4 +195,35 @@ func HandleGetUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user_info)
+}
+
+func HandleDeleteSubscription(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	user_data, err := db.GetUserByID(claims.Sub)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	params := &stripe.SubscriptionCancelParams{}
+	result, err := subscription.Cancel(*user_data.SubscriptionID, params)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error communicating with stripe upon cancellation": err.Error()})
+	}
+
+	c.JSON(http.StatusOK, result)
 }
