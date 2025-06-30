@@ -105,6 +105,7 @@ func main() {
 		api.POST("/user-info/delete", handlers.DeleteUserInfo)
 		api.POST("/user-info/get", handlers.GetUserInfo)
 		api.POST("/user/get", handlers.HandleGetUser)
+		api.POST("/user/delete", handlers.HandleDeleteUser)
 		api.POST("/stripe/session/create", handlers.HandleCreateStripeSession)
 		api.POST("/stripe/subscription/delete", handlers.HandleDeleteSubscription)
 	}

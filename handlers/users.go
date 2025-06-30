@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func HandleDeleteAccount(c *gin.Context) {
+func HandleDeleteUser(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		logger.Get().Error("user not authenticated")

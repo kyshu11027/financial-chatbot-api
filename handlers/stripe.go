@@ -160,6 +160,18 @@ func HandleStripeWebhook(c *gin.Context) {
 		}
 
 	case "customer.subscription.deleted":
+		logger.Get().Info("Customer subscription deleted", zap.String("event_type", string(event.Type)), zap.String("event_id", event.ID))
+
+		var subscription stripe.Subscription
+		if err := json.Unmarshal(event.Data.Raw, &subscription); err != nil {
+			logger.Get().Error("Error parsing subscription", zap.Error(err))
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		logger.Get().Info("Parsed subscription", zap.String("customer_id", subscription.Customer.ID))
+
+		stripeID = subscription.Customer.ID
 		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusInactive, nil); err != nil {
 			logger.Get().Error("Error updating user status", zap.Error(err))
 			c.Status(http.StatusInternalServerError)
