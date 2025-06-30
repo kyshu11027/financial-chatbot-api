@@ -40,25 +40,27 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 		return nil, err
 	}
 
+	conversationContext := &models.Context{
+		ConversationID: conversationID,
+		UserID:         userID,
+		CreatedAt:      time.Now().Unix(),
+		Accounts:       accounts,
+	}
+
 	userInfo, err := getUserInfo(c, userID)
 	if err != nil {
 		logger.Get().Error("error getting user info",
 			zap.String("user_id", userID),
 			zap.Error(err))
-		return nil, err
 	}
-
-	conversationContext := &models.Context{
-		ConversationID:     conversationID,
-		UserID:             userID,
-		CreatedAt:          time.Now().Unix(),
-		Accounts:           accounts,
-		Income:             userInfo.Income,
-		SavingsGoal:        userInfo.SavingsGoal,
-		Name:               userInfo.Name,
-		AdditionalExpenses: userInfo.AdditionalExpenses,
+	
+	if userInfo != nil {
+		conversationContext.Income = userInfo.Income
+		conversationContext.SavingsGoal = userInfo.SavingsGoal
+		conversationContext.Name = userInfo.Name
+		conversationContext.AdditionalExpenses = userInfo.AdditionalExpenses
 	}
-
+	
 	logger.Get().Info("conversation context created successfully",
 		zap.String("user_id", userID),
 		zap.String("conversation_id", conversationID))

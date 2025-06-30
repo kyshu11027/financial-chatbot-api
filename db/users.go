@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func UpdateStatusByUserID(userID, status models.UserStatus) error {
+func UpdateStatusByUserID(userID string, status models.UserStatus) error {
 	query := `
 		UPDATE users
 		SET status = $1

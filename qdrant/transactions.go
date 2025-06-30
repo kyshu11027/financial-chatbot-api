@@ -35,7 +35,7 @@ func DeleteTransactionsByUserID(userId string) error {
 	_, err := QdrantClient.Delete(context.Background(), &qdrant.DeletePoints{
 		CollectionName: TransactionsCollection,
 		Points:         qdrant.NewPointsSelectorFilter(filter),
-		Wait:           &waitBeforeReturning, 
+		Wait:           &waitBeforeReturning,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete transactions for user_id %s: %w", userId, err)
