@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/handlers"
 	"finance-chatbot/api/kafka"
@@ -9,9 +10,11 @@ import (
 	"finance-chatbot/api/mongodb"
 	"finance-chatbot/api/qdrant"
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -133,13 +136,24 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
+
 	go func() {
-		logger.Get().Info("Server starting", zap.String("port", port))
-		if err := router.Run(":" + port); err != nil {
-			logger.Get().Fatal("Failed to start server", zap.Error(err))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Get().Fatal("listen error", zap.Error(err))
 		}
 	}()
 
 	<-quit
 	logger.Get().Info("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Get().Fatal("Server forced to shutdown", zap.Error(err))
+	}
+	logger.Get().Info("Server exiting")
 }

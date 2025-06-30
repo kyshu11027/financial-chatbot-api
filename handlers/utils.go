@@ -53,14 +53,14 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 			zap.String("user_id", userID),
 			zap.Error(err))
 	}
-	
+
 	if userInfo != nil {
 		conversationContext.Income = userInfo.Income
 		conversationContext.SavingsGoal = userInfo.SavingsGoal
 		conversationContext.Name = userInfo.Name
 		conversationContext.AdditionalExpenses = userInfo.AdditionalExpenses
 	}
-	
+
 	logger.Get().Info("conversation context created successfully",
 		zap.String("user_id", userID),
 		zap.String("conversation_id", conversationID))
