@@ -74,18 +74,29 @@ func GetPlaidItemsByUserID(userID string) ([]*models.PlaidItem, error) {
 	return items, nil
 }
 
-func DeletePlaidItemsByUserID(userId string) error {
+func DeletePlaidItemsByUserID(userId string) ([]string, error) {
 	query := `
 		DELETE FROM plaid_items
 		WHERE user_id = $1
+		RETURNING access_token
 	`
 
-	_, err := DB.Exec(query, userId)
+	rows, err := DB.Query(query, userId)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer rows.Close()
+
+	var accessTokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			return nil, err
+		}
+		accessTokens = append(accessTokens, token)
 	}
 
-	return nil
+	return accessTokens, nil
 }
 
 // UpdatePlaidItemStatus updates the status of a Plaid item

@@ -4,6 +4,7 @@ import (
 	"finance-chatbot/api/db"
 	"finance-chatbot/api/logger"
 	"finance-chatbot/api/models"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -467,4 +468,15 @@ func HandleSuccessfulPlaidItemUpdate(c *gin.Context) {
 	logger.Get().Info("Updated item status to HEALTHY", zap.String("item_id", req.ItemID))
 
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func DeletePlaidItems(c *gin.Context, accessTokens []string) error {
+	for _, token := range accessTokens {
+		request := plaid.NewItemRemoveRequest(token)
+		_, _, err := PlaidClient.PlaidApi.ItemRemove(c).ItemRemoveRequest(*request).Execute()
+		if err != nil {
+			return fmt.Errorf("failed to remove Plaid item with token %s: %w", token, err)
+		}
+	}
+	return nil
 }

@@ -237,5 +237,17 @@ func HandleDeleteSubscription(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error communicating with stripe upon cancellation": err.Error()})
 	}
 
+	accessTokens, err := db.DeletePlaidItemsByUserID(claims.Sub)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error deleting plaid items from postgres": err.Error()})
+	}
+
+	err = DeletePlaidItems(c, accessTokens)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error removing plaid items from plaid": err.Error()})
+	}
+
 	c.JSON(http.StatusOK, result)
 }
