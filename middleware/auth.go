@@ -18,8 +18,7 @@ func AuthMiddleware(c *gin.Context) {
 	tokenString := extractToken(c.Request)
 	if tokenString == "" {
 		logger.Get().Error("missing or invalid token")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid token"})
 		return
 	}
 
@@ -39,15 +38,13 @@ func AuthMiddleware(c *gin.Context) {
 
 	if err != nil {
 		logger.Get().Error("error parsing claims", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: " + err.Error()})
 		return
 	}
 
 	if !token.Valid {
 		logger.Get().Error("invalid token")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
 	}
 
@@ -55,8 +52,7 @@ func AuthMiddleware(c *gin.Context) {
 	if claims.Issuer != os.Getenv("SUPABASE_URL")+"/auth/v1" {
 		logger.Get().Error("invalid token issuer",
 			zap.String("issuer", claims.Issuer))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
 		return
 	}
 

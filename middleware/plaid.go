@@ -27,8 +27,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	bodyBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		logger.Get().Error("failed to read request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
 		return
 	}
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
@@ -37,8 +36,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	tokenString := c.GetHeader("Plaid-Verification")
 	if tokenString == "" {
 		logger.Get().Error("missing Plaid-Verification header")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing Plaid-Verification header"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing Plaid-Verification header"})
 		return
 	}
 
@@ -46,8 +44,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
 		logger.Get().Error("failed to parse JWT", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT"})
 		return
 	}
 
@@ -55,8 +52,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	if token.Method.Alg() != "ES256" {
 		logger.Get().Error("unexpected JWT signing algorithm",
 			zap.String("alg", token.Method.Alg()))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unexpected signing algorithm"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unexpected signing algorithm"})
 		return
 	}
 
@@ -64,8 +60,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	kid, ok := token.Header["kid"].(string)
 	if !ok || kid == "" {
 		logger.Get().Error("missing kid in JWT header")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing key ID"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing key ID"})
 		return
 	}
 
@@ -74,8 +69,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 		publicKey, fetchErr := fetchPlaidKey(kid)
 		if fetchErr != nil {
 			logger.Get().Error("failed to fetch public key", zap.Error(fetchErr))
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to fetch verification key"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Failed to fetch verification key"})
 			return
 		}
 		cachedPlaidKey = &publicKey
@@ -85,8 +79,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 	pubKey, err := buildPublicKey(cachedPlaidKey)
 	if err != nil {
 		logger.Get().Error("failed to construct public key", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid public key"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid public key"})
 		return
 	}
 
@@ -97,8 +90,7 @@ func PlaidWebhookVerifier(c *gin.Context) {
 
 	if err != nil {
 		logger.Get().Error("JWT verification failed", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT signature"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT signature"})
 		return
 	}
 
