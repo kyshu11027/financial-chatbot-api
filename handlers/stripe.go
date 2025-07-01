@@ -42,7 +42,7 @@ func HandleCreateStripeSession(c *gin.Context) {
 
 	subscriptionData := &stripe.CheckoutSessionSubscriptionDataParams{}
 	if !userInfo.HasUsedTrial {
-		logger.Get().Debug("User has used free trial, removing trial period")
+		logger.Get().Debug("User has not used free trial, adding trial period")
 		subscriptionData.TrialPeriodDays = stripe.Int64(1)
 	}
 

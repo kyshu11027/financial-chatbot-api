@@ -87,3 +87,32 @@ func GetUserByID(userID string) (*models.User, error) {
 	}
 	return user, nil
 }
+
+func DeleteUserDataByID(userID string) (err error) {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	// Execute deletes separately
+	if _, err = tx.Exec(`DELETE FROM plaid_items WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(`DELETE FROM conversations WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+
+	return nil
+}

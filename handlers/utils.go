@@ -69,7 +69,7 @@ func createConversationContext(c *gin.Context, userID string, conversationID str
 
 func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transaction, error) {
 	endDate := time.Now().Format("2006-01-02")
-	startDate := time.Now().AddDate(0, 0, -180).Format("2006-01-02")
+	startDate := time.Now().AddDate(0, 0, -730).Format("2006-01-02")
 	transactions := []models.Transaction{}
 
 	logger.Get().Info("fetching transactions",
