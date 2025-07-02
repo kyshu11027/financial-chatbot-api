@@ -70,15 +70,28 @@ func UpdateStatusByStripeID(stripeID string, status models.UserStatus, subscript
 	return nil
 }
 
+func UpdatePlaidUserTokenByUserID(userID string, plaidUserToken string) error {
+	query := `
+		UPDATE users
+		SET plaid_user_token = $1
+		WHERE id = $2
+	`
+	_, err := DB.Exec(query, plaidUserToken, userID)
+	if err != nil {
+		return fmt.Errorf("error updating trial status for user %s: %v", userID, err)
+	}
+	return nil
+}
+
 func GetUserByID(userID string) (*models.User, error) {
 	query := `
-		SELECT id, stripe_id, status, email, has_used_trial, subscription_id
+		SELECT id, stripe_id, status, email, has_used_trial, subscription_id, plaid_user_token, consent_retrieved, consent_retrieved_at
 		FROM users
 		WHERE id = $1
 	`
 	row := DB.QueryRow(query, userID)
 	user := &models.User{}
-	err := row.Scan(&user.UserID, &user.StripeID, &user.Status, &user.Email, &user.HasUsedTrial, &user.SubscriptionID)
+	err := row.Scan(&user.UserID, &user.StripeID, &user.Status, &user.Email, &user.HasUsedTrial, &user.SubscriptionID, &user.PlaidUserToken, &user.ConsentRetrieved, &user.ConsentRetrievedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found: %s", userID)
@@ -88,10 +101,10 @@ func GetUserByID(userID string) (*models.User, error) {
 	return user, nil
 }
 
-func DeleteUserDataByID(userID string) (err error) {
+func DeleteUserDataByID(userID string) (accessTokens []string, err error) {
 	tx, err := DB.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer func() {
@@ -105,14 +118,28 @@ func DeleteUserDataByID(userID string) (err error) {
 		}
 	}()
 
-	// Execute deletes separately
-	if _, err = tx.Exec(`DELETE FROM plaid_items WHERE user_id = $1`, userID); err != nil {
-		return err
+	// Delete plaid_items and return access_tokens
+	rows, err := tx.Query(`DELETE FROM plaid_items WHERE user_id = $1 RETURNING access_token`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			return nil, err
+		}
+		accessTokens = append(accessTokens, token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
+	// Delete conversations
 	if _, err = tx.Exec(`DELETE FROM conversations WHERE user_id = $1`, userID); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return accessTokens, nil
 }

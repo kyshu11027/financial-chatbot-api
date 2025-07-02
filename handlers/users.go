@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stripe/stripe-go/v82"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +32,25 @@ func HandleDeleteUser(c *gin.Context) {
 		return
 	}
 
-	err := db.DeleteUserDataByID(claims.Sub)
+	_, err := unsubscribeFromStripe(claims.Sub)
+	if err != nil {
+		if stripeErr, ok := err.(*stripe.Error); ok {
+			switch stripeErr.Code {
+			case stripe.ErrorCodeResourceMissing:
+				logger.Get().Warn("Stripe subscription not found (likely already deleted)", zap.String("user_id", claims.Sub))
+			default:
+				logger.Get().Error("Stripe error during unsubscribe", zap.String("code", string(stripeErr.Code)), zap.Error(err))
+				c.JSON(http.StatusBadGateway, gin.H{"error": "Stripe error: " + stripeErr.Msg})
+				return
+			}
+		} else {
+			logger.Get().Error("Error unsubscribing from Stripe", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	accessTokens, err := db.DeleteUserDataByID(claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error deleting user data stored in Postgres", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting user data stored in Postgres"})
@@ -39,7 +58,23 @@ func HandleDeleteUser(c *gin.Context) {
 		logger.Get().Info("Deleted user data from Postgres", zap.String("user_id", claims.Sub))
 	}
 
-	err = mongodb.DeleteContextsByUserID(c, claims.Sub)
+	err = DeletePlaidItems(c, accessTokens)
+	if err != nil {
+		logger.Get().Error("Error deleting plaid items from plaid", zap.Error(err), zap.String("user_id", claims.Sub))
+		c.JSON(http.StatusInternalServerError, gin.H{"error removing plaid items from plaid": err.Error()})
+	} else {
+		logger.Get().Info("Deleted plaid items from plaid", zap.String("user_id", claims.Sub))
+	}
+
+	err = DeletePlaidUser(c)
+	if err != nil {
+		logger.Get().Error("Error deleting plaid user from plaid", zap.Error(err), zap.String("user_id", claims.Sub))
+		c.JSON(http.StatusInternalServerError, gin.H{"error removing plaid user from plaid": err.Error()})
+	} else {
+		logger.Get().Info("Deleted plaid user from plaid", zap.String("user_id", claims.Sub))
+	}
+
+	err = mongodb.DeleteContextsByUserID(c.Request.Context(), claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error deleting user conversation contexts", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting user conversation contexts"})
@@ -47,7 +82,7 @@ func HandleDeleteUser(c *gin.Context) {
 		logger.Get().Info("Deleted user conversation contexts from MongoDB", zap.String("user_id", claims.Sub))
 	}
 
-	err = mongodb.DeleteUserInfo(c, claims.Sub)
+	err = mongodb.DeleteUserInfo(c.Request.Context(), claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error deleting user info", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting user info"})
@@ -55,7 +90,7 @@ func HandleDeleteUser(c *gin.Context) {
 		logger.Get().Info("Deleted user info from MongoDB", zap.String("user_id", claims.Sub))
 	}
 
-	err = mongodb.DeleteMessagesByUserID(c, claims.Sub)
+	err = mongodb.DeleteMessagesByUserID(c.Request.Context(), claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error deleting conversation messages", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting conversation messages"})
@@ -79,7 +114,7 @@ func HandleDeleteUser(c *gin.Context) {
 		logger.Get().Info("Updated user status to deleted", zap.String("user_id", claims.Sub))
 	}
 
-	err = DeleteSupabaseUser(claims.Sub,)
+	err = DeleteSupabaseUser(claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error deleting user from Supabase", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting user from Supabase"})
@@ -90,7 +125,6 @@ func HandleDeleteUser(c *gin.Context) {
 	logger.Get().Info("HandleDeleteUser completed successfully", zap.String("user_id", claims.Sub))
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-
 
 func DeleteSupabaseUser(userID string) error {
 	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", os.Getenv("SUPABASE_URL"), userID)
@@ -112,7 +146,7 @@ func DeleteSupabaseUser(userID string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK{
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code deleting user: %d", resp.StatusCode)
 	}
 

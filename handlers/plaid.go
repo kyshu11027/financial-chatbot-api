@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/plaid/plaid-go/v20/plaid"
+	"github.com/plaid/plaid-go/v37/plaid"
 	"go.uber.org/zap"
 )
 
@@ -47,6 +47,39 @@ func CreateLinkToken(c *gin.Context) {
 		return
 	}
 
+	user_data, err := db.GetUserByID(claims.Sub)
+
+	if err != nil {
+		logger.Get().Error("Error getting user data from postgres", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error getting user data from database"})
+	}
+
+	var plaidUserToken string
+
+	if user_data.PlaidUserToken == nil {
+		createUserRequest := plaid.NewUserCreateRequest(claims.Sub)
+
+		createResp, _, err := PlaidClient.PlaidApi.UserCreate(c.Request.Context()).UserCreateRequest(*createUserRequest).Execute()
+
+		if err != nil {
+			logger.Get().Error("Error creating Plaid user", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Plaid user"})
+			return
+		}
+
+		userToken := createResp.GetUserToken()
+
+		err = db.UpdatePlaidUserTokenByUserID(claims.Sub, userToken)
+
+		if err != nil {
+			logger.Get().Error("Error updating plaid user token", zap.Error(err))
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Error updating plaid user token"})
+		}
+		plaidUserToken = userToken
+	} else {
+		plaidUserToken = *user_data.PlaidUserToken
+	}
+
 	linkTokenRequest := plaid.NewLinkTokenCreateRequest(
 		"Finance Chatbot",
 		"en",
@@ -55,6 +88,7 @@ func CreateLinkToken(c *gin.Context) {
 			ClientUserId: claims.Sub,
 		},
 	)
+	linkTokenRequest.SetUserToken(plaidUserToken)
 	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
 	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
 
@@ -471,12 +505,45 @@ func HandleSuccessfulPlaidItemUpdate(c *gin.Context) {
 }
 
 func DeletePlaidItems(c *gin.Context, accessTokens []string) error {
+
 	for _, token := range accessTokens {
 		request := plaid.NewItemRemoveRequest(token)
-		_, _, err := PlaidClient.PlaidApi.ItemRemove(c).ItemRemoveRequest(*request).Execute()
+		_, _, err := PlaidClient.PlaidApi.ItemRemove(c.Request.Context()).ItemRemoveRequest(*request).Execute()
 		if err != nil {
 			return fmt.Errorf("failed to remove Plaid item with token %s: %w", token, err)
 		}
+	}
+	return nil
+}
+
+func DeletePlaidUser(c *gin.Context) error {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated when deleting plaid user")
+		return fmt.Errorf("user not authenticated when deleting plaid user")
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims when deleting plaid user")
+		return fmt.Errorf("invalid user claims when deleting plaid user")
+	}
+
+	user_data, err := db.GetUserByID(claims.Sub)
+
+	if err != nil {
+		logger.Get().Error("Error getting user data from postgres", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error getting user data from database"})
+	}
+
+	plaidUserToken := user_data.PlaidUserToken
+
+	request := plaid.NewUserRemoveRequest()
+	request.SetUserToken(*plaidUserToken)
+
+	_, _, err = PlaidClient.PlaidApi.UserRemove(c.Request.Context()).UserRemoveRequest(*request).Execute()
+	if err != nil {
+		return fmt.Errorf("failed to remove Plaid user: %w", err)
 	}
 	return nil
 }

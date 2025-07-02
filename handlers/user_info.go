@@ -36,7 +36,7 @@ func CreateUserInfo(c *gin.Context) {
 	req.UserID = claims.Sub
 	req.CreatedAt = time.Now().Unix()
 
-	err := mongodb.CreateUserInfo(c, &req)
+	err := mongodb.CreateUserInfo(c.Request.Context(), &req)
 	if err != nil {
 		logger.Get().Error("error creating user info",
 			zap.String("user_id", claims.Sub),
@@ -74,7 +74,7 @@ func UpdateUserInfo(c *gin.Context) {
 
 	req.UserID = claims.Sub
 
-	err := mongodb.ReplaceUserInfo(c, claims.Sub, &req)
+	err := mongodb.ReplaceUserInfo(c.Request.Context(), claims.Sub, &req)
 	if err != nil {
 		logger.Get().Error("error updating user info",
 			zap.String("user_id", claims.Sub),
@@ -103,7 +103,7 @@ func DeleteUserInfo(c *gin.Context) {
 		return
 	}
 
-	err := mongodb.DeleteUserInfo(c, claims.Sub)
+	err := mongodb.DeleteUserInfo(c.Request.Context(), claims.Sub)
 	if err != nil {
 		logger.Get().Error("error deleting user info",
 			zap.String("user_id", claims.Sub),
@@ -132,7 +132,7 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	userInfo, err := mongodb.GetUserInfo(c, claims.Sub)
+	userInfo, err := mongodb.GetUserInfo(c.Request.Context(), claims.Sub)
 	if err != nil {
 		logger.Get().Error("error retrieving user info",
 			zap.String("user_id", claims.Sub),

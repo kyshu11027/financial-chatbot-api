@@ -72,7 +72,7 @@ func HandleCreateNewConversation(c *gin.Context) {
 		return
 	}
 
-	err = mongodb.CreateConversationContext(c, conversationContext)
+	err = mongodb.CreateConversationContext(c.Request.Context(), conversationContext)
 	if err != nil {
 		logger.Get().Error("error saving conversation context to MongoDB",
 			zap.String("conversation_id", conversation.ID.String()),
@@ -98,7 +98,7 @@ func HandleCreateNewConversation(c *gin.Context) {
 		Text:           req.Message,
 	}
 	c.JSON(http.StatusOK, gin.H{"conversation_id": conversation.ID.String(), "conversation_title": conversation.Title})
-	processUserMessage(c, claims.Sub, msg)
+	processUserMessage(c.Request.Context(), claims.Sub, msg)
 }
 
 func HandleGetConversations(c *gin.Context) {
@@ -116,7 +116,7 @@ func HandleGetConversations(c *gin.Context) {
 		return
 	}
 
-	conversations, err := db.GetAllByUserID(claims.Sub)
+	conversations, err := db.GetAllConversationsByUserID(claims.Sub)
 	if err != nil {
 		logger.Get().Error("error fetching conversations",
 			zap.String("user_id", claims.Sub),
@@ -240,7 +240,7 @@ func HandleDeleteConversation(c *gin.Context) {
 		return
 	}
 
-	err = mongodb.DeleteConversation(c, req.ConversationID)
+	err = mongodb.DeleteConversation(c.Request.Context(), req.ConversationID)
 	if err != nil {
 		logger.Get().Error("error deleting conversation context from MongoDB",
 			zap.String("conversation_id", req.ConversationID),
@@ -249,7 +249,7 @@ func HandleDeleteConversation(c *gin.Context) {
 		return
 	}
 
-	err = mongodb.DeleteMessages(c, req.ConversationID)
+	err = mongodb.DeleteMessages(c.Request.Context(), req.ConversationID)
 	if err != nil {
 		logger.Get().Error("error deleting conversation messages from MongoDB",
 			zap.String("conversation_id", req.ConversationID),

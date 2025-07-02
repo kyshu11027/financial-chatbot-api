@@ -56,7 +56,7 @@ func GetByID(id string) (*models.Conversation, error) {
 	return item, nil
 }
 
-func GetAllByUserID(userID string) ([]*models.Conversation, error) {
+func GetAllConversationsByUserID(userID string) ([]*models.Conversation, error) {
 	query := `
 		SELECT id, user_id, created_at, title
 		FROM conversations

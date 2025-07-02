@@ -40,7 +40,7 @@ func HandleSendMessage(c *gin.Context) {
 		zap.String("conversation_id", req.ConversationID),
 		zap.String("user_id", claims.Sub))
 
-	err := processUserMessage(c, claims.Sub, &req)
+	err := processUserMessage(c.Request.Context(), claims.Sub, &req)
 	if err != nil {
 		logger.Get().Error("error processing message",
 			zap.String("conversation_id", req.ConversationID),
@@ -79,7 +79,7 @@ func HandleGetMessagesByConversationID(c *gin.Context) {
 		return
 	}
 
-	messages, err := mongodb.GetMessagesByConversationID(c, claims.Sub, req.ConversationID)
+	messages, err := mongodb.GetMessagesByConversationID(c.Request.Context(), claims.Sub, req.ConversationID)
 	if err != nil {
 		logger.Get().Error("error fetching messages",
 			zap.String("conversation_id", req.ConversationID),

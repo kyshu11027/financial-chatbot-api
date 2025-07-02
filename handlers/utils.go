@@ -15,7 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/plaid/plaid-go/v20/plaid"
+	"github.com/plaid/plaid-go/v37/plaid"
 	"go.uber.org/zap"
 )
 
@@ -200,7 +200,7 @@ func getAccounts(c *gin.Context, items []*models.PlaidItem) ([]models.Account, e
 }
 
 func getUserInfo(c *gin.Context, userID string) (*models.UserInfo, error) {
-	userInfo, err := mongodb.GetUserInfo(c, userID)
+	userInfo, err := mongodb.GetUserInfo(c.Request.Context(), userID)
 	if err != nil {
 		logger.Get().Error("error fetching user info",
 			zap.String("user_id", userID),

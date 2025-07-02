@@ -224,30 +224,48 @@ func HandleDeleteSubscription(c *gin.Context) {
 		return
 	}
 
-	user_data, err := db.GetUserByID(claims.Sub)
+	result, err := unsubscribeFromStripe(claims.Sub)
 
 	if err != nil {
+
+		logger.Get().Error("Error unsubscribing from Stripe", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	accessTokens, err := db.DeletePlaidItemsByUserID(claims.Sub)
+
+	if err != nil {
+		logger.Get().Error("Error deleting items from postegres", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	err = DeletePlaidItems(c, accessTokens)
+
+	if err != nil {
+		logger.Get().Error("Error deleting items from plaid", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func unsubscribeFromStripe(userId string) (*stripe.Subscription, error) {
+	user_data, err := db.GetUserByID(userId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if user_data.SubscriptionID == nil {
+		logger.Get().Info("No subscription ID found for user, skipping Stripe cancellation")
+		return nil, nil
 	}
 
 	params := &stripe.SubscriptionCancelParams{}
 	result, err := subscription.Cancel(*user_data.SubscriptionID, params)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error communicating with stripe upon cancellation": err.Error()})
+		return nil, err
 	}
-
-	accessTokens, err := db.DeletePlaidItemsByUserID(claims.Sub)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error deleting plaid items from postgres": err.Error()})
-	}
-
-	err = DeletePlaidItems(c, accessTokens)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error removing plaid items from plaid": err.Error()})
-	}
-
-	c.JSON(http.StatusOK, result)
+	return result, nil
 }
