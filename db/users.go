@@ -6,18 +6,19 @@ import (
 	"fmt"
 )
 
-func UpdateStatusByUserID(userID string, status models.UserStatus) error {
+func UpdateStatusToDeleteStateByUserID(userID string) error {
 	query := `
 		UPDATE users
-		SET status = $1
-		WHERE id = $2
+		SET status = 'deleted', plaid_user_token = null
+		WHERE id = $1
 	`
-	_, err := DB.Exec(query, status, userID)
+	_, err := DB.Exec(query, userID)
 	if err != nil {
 		return fmt.Errorf("error updating status for user %s: %v", userID, err)
 	}
 	return nil
 }
+
 
 func UpdateStripeIDByUserID(userID, stripeID string) error {
 	query := `

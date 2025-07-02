@@ -106,12 +106,12 @@ func HandleDeleteUser(c *gin.Context) {
 		logger.Get().Info("Deleted transactions from Qdrant", zap.String("user_id", claims.Sub))
 	}
 
-	err = db.UpdateStatusByUserID(claims.Sub, models.UserStatusDeleted)
+	err = db.UpdateStatusToDeleteStateByUserID(claims.Sub)
 	if err != nil {
 		logger.Get().Error("Error updating user status", zap.Error(err), zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating user status"})
 	} else {
-		logger.Get().Info("Updated user status to deleted", zap.String("user_id", claims.Sub))
+		logger.Get().Info("Updated user status to deleted and removed plaid user token", zap.String("user_id", claims.Sub))
 	}
 
 	err = DeleteSupabaseUser(claims.Sub)
