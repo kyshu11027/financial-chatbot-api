@@ -45,7 +45,11 @@ func init() {
 	configuration := plaid.NewConfiguration()
 	configuration.AddDefaultHeader("PLAID-CLIENT-ID", os.Getenv("PLAID_CLIENT_ID"))
 	configuration.AddDefaultHeader("PLAID-SECRET", os.Getenv("PLAID_SECRET"))
-	configuration.UseEnvironment(plaid.Sandbox) // Change to Development or Production as needed
+	if os.Getenv("ENV") != "production" {
+		configuration.UseEnvironment(plaid.Production)
+	} else {
+		configuration.UseEnvironment(plaid.Sandbox)
+	}
 	handlers.PlaidClient = plaid.NewAPIClient(configuration)
 
 	// Initialize Stripe client
