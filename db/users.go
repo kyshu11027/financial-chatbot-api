@@ -19,7 +19,6 @@ func UpdateStatusToDeleteStateByUserID(userID string) error {
 	return nil
 }
 
-
 func UpdateStripeIDByUserID(userID, stripeID string) error {
 	query := `
 		UPDATE users
@@ -78,6 +77,19 @@ func UpdatePlaidUserTokenByUserID(userID string, plaidUserToken string) error {
 		WHERE id = $2
 	`
 	_, err := DB.Exec(query, plaidUserToken, userID)
+	if err != nil {
+		return fmt.Errorf("error updating consent retrieved for user %s: %v", userID, err)
+	}
+	return nil
+}
+
+func UpdateConsentRetrievedByUserID(userID string) error {
+	query := `
+		UPDATE users
+		SET consent_retrieved = true, consent_retrieved_at = NOW()
+		WHERE id = $1
+	`
+	_, err := DB.Exec(query, userID)
 	if err != nil {
 		return fmt.Errorf("error updating trial status for user %s: %v", userID, err)
 	}

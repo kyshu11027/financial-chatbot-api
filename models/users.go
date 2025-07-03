@@ -11,7 +11,7 @@ type User struct {
 	HasUsedTrial       bool       `bson:"has_used_trial" json:"has_used_trial"`
 	PlaidUserToken     *string    `bson:"plaid_user_token" json:"plaid_user_token"`
 	ConsentRetrieved   bool       `bson:"consent_retrieved" json:"consent_retrieved"`
-	ConsentRetrievedAt *time.Time  `bson:"consent_retrieved_at" json:"consent_retrieved_at"`
+	ConsentRetrievedAt *time.Time `bson:"consent_retrieved_at" json:"consent_retrieved_at"`
 }
 
 type UserStatus string

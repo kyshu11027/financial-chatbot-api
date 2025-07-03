@@ -126,6 +126,30 @@ func HandleDeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func HandleUpdateUserConsent(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		logger.Get().Error("user not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	claims, ok := user.(*models.SupabaseClaims)
+	if !ok {
+		logger.Get().Error("invalid user claims")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user claims"})
+		return
+	}
+
+	err := db.UpdateConsentRetrievedByUserID(claims.Sub)
+	if err != nil {
+		logger.Get().Error("Error updating user consent in Postgres", zap.Error(err), zap.String("user_id", claims.Sub))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating user consent"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func DeleteSupabaseUser(userID string) error {
 	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", os.Getenv("SUPABASE_URL"), userID)
 
