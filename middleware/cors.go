@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,10 +14,10 @@ func CorsMiddleware(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	case strings.HasPrefix(c.Request.URL.Path, "/sse"):
 		// SSE endpoint — often public, allow any origin
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_URL"))
 	default:
 		// Protected endpoints: restrict origin & allow credentials
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // or hardcode frontend URL
+		c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_URL")) // or hardcode frontend URL
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 	}
 
