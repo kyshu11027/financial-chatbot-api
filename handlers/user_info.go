@@ -142,7 +142,7 @@ func GetUserInfo(c *gin.Context) {
 	}
 
 	if userInfo == nil {
-		logger.Get().Info("no user info found",
+		logger.Get().Debug("no user info found",
 			zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusOK, gin.H{"no_user_info": true})
 		return

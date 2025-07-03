@@ -169,7 +169,7 @@ func HandleStripeWebhook(c *gin.Context) {
 			return
 		}
 
-		logger.Get().Info("Parsed subscription", zap.String("customer_id", subscription.Customer.ID))
+		logger.Get().Debug("Parsed subscription", zap.String("customer_id", subscription.Customer.ID))
 
 		stripeID = subscription.Customer.ID
 		if err := db.UpdateStatusByStripeID(stripeID, models.UserStatusInactive, nil); err != nil {

@@ -36,7 +36,7 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 
-	logger.Get().Info("received message request",
+	logger.Get().Debug("received message request",
 		zap.String("conversation_id", req.ConversationID),
 		zap.String("user_id", claims.Sub))
 
@@ -50,7 +50,7 @@ func HandleSendMessage(c *gin.Context) {
 		return
 	}
 
-	logger.Get().Info("message sent successfully",
+	logger.Get().Debug("message sent successfully",
 		zap.String("conversation_id", req.ConversationID),
 		zap.String("user_id", claims.Sub))
 
@@ -90,7 +90,7 @@ func HandleGetMessagesByConversationID(c *gin.Context) {
 	}
 
 	if len(messages) == 0 {
-		logger.Get().Info("no messages found",
+		logger.Get().Debug("no messages found",
 			zap.String("conversation_id", req.ConversationID),
 			zap.String("user_id", claims.Sub))
 		c.JSON(http.StatusOK, []models.Message{})

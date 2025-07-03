@@ -92,7 +92,7 @@ func CreateLinkToken(c *gin.Context) {
 	linkTokenRequest.SetProducts([]plaid.Products{plaid.PRODUCTS_TRANSACTIONS})
 	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
 
-	logger.Get().Info("creating link token",
+	logger.Get().Debug("creating link token",
 		zap.String("user_id", claims.Sub),
 		zap.Any("request", linkTokenRequest))
 
@@ -152,7 +152,7 @@ func CreateUpdateLinkToken(c *gin.Context) {
 	linkTokenRequest.SetWebhook(os.Getenv("PLAID_WEBHOOK_URL"))
 	linkTokenRequest.SetAccessToken(req.AccessToken)
 
-	logger.Get().Info("creating link token",
+	logger.Get().Debug("creating link token",
 		zap.String("user_id", claims.Sub),
 		zap.Any("request", linkTokenRequest))
 
@@ -439,7 +439,7 @@ func ProvisionTransactionsJob(c *gin.Context) {
 }
 
 func HandlePlaidWebhook(c *gin.Context) {
-	logger.Get().Info("Received Plaid webhook")
+	logger.Get().Debug("Received Plaid webhook")
 
 	var webhook models.GenericPlaidWebhook
 	if err := c.ShouldBindJSON(&webhook); err != nil {
@@ -448,7 +448,7 @@ func HandlePlaidWebhook(c *gin.Context) {
 		return
 	}
 
-	logger.Get().Info("Parsed Plaid webhook",
+	logger.Get().Debug("Parsed Plaid webhook",
 		zap.String("webhook_type", webhook.WebhookType),
 		zap.String("webhook_code", webhook.WebhookCode),
 		zap.String("webhook_item_id", webhook.ItemID),

@@ -16,7 +16,7 @@ import (
 )
 
 func HandleDeleteUser(c *gin.Context) {
-	logger.Get().Info("HandleDeleteUser called")
+	logger.Get().Debug("HandleDeleteUser called")
 
 	user, exists := c.Get("user")
 	if !exists {

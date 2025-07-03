@@ -20,7 +20,7 @@ import (
 )
 
 func createConversationContext(c *gin.Context, userID string, conversationID string) (*models.Context, error) {
-	logger.Get().Info("creating conversation context",
+	logger.Get().Debug("creating conversation context",
 		zap.String("user_id", userID),
 		zap.String("conversation_id", conversationID))
 
@@ -72,7 +72,7 @@ func getTransactions(c *gin.Context, items []*models.PlaidItem) ([]models.Transa
 	startDate := time.Now().AddDate(0, 0, -730).Format("2006-01-02")
 	transactions := []models.Transaction{}
 
-	logger.Get().Info("fetching transactions",
+	logger.Get().Debug("fetching transactions",
 		zap.String("start_date", startDate),
 		zap.String("end_date", endDate))
 
