@@ -1,33 +1,42 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-bullseye AS builder
 
-# Install git and ca-certificates (needed for go mod download)
-RUN apk add --no-cache git ca-certificates tzdata
+# Install dependencies for confluent-kafka-go
+RUN apt-get update && apt-get install -y \
+    git \
+    ca-certificates \
+    tzdata \
+    build-essential \
+    librdkafka-dev \
+ && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy the rest of the source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+# Build the Go application with CGO enabled
+RUN CGO_ENABLED=1 GOOS=linux go build -o main .
 
 # Final stage
-FROM alpine:latest
+FROM debian:bullseye-slim
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates tzdata
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tzdata \
+    librdkafka1 \
+    wget \
+ && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+# Create a non-root user for running the app
+RUN addgroup --gid 1001 appgroup && \
+    adduser --uid 1001 --ingroup appgroup --disabled-password --gecos "" appuser
 
 # Set working directory
 WORKDIR /app
@@ -35,21 +44,18 @@ WORKDIR /app
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy any additional files if needed (like config files)
-# COPY --from=builder /app/.env.example ./
-
-# Change ownership to non-root user
+# Change ownership of files to non-root user
 RUN chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser
 
-# Expose port
+# Expose port used by the app
 EXPOSE 8080
 
-# Health check
+# Health check (optional)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/metrics || exit 1
 
 # Run the application
-CMD ["./main"] 
+CMD ["./main"]

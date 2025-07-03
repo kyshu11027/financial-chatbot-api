@@ -34,9 +34,11 @@ func init() {
 	}
 	defer logger.Sync()
 
-	// Load environment variables after logger is initialized
-	if err := godotenv.Load(); err != nil {
-		logger.Get().Error("Warning: .env file not found")
+	// Load environment variables if environment is not production
+	if os.Getenv("ENV") != "production" {
+		if err := godotenv.Load(); err != nil {
+			logger.Get().Error("Warning: .env file not found")
+		}
 	}
 
 	// Initialize Plaid client
