@@ -52,6 +52,7 @@ func CreateLinkToken(c *gin.Context) {
 	if err != nil {
 		logger.Get().Error("Error getting user data from postgres", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error getting user data from database"})
+		return
 	}
 
 	var plaidUserToken string
