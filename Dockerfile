@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     tzdata \
     librdkafka1 \
-    wget \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for running the app
@@ -53,9 +53,9 @@ USER appuser
 # Expose port used by the app
 EXPOSE 8080
 
-# Health check (optional)
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --method=GET --no-verbose --tries=1 http://localhost:8080/metrics || exit 1
+  CMD curl --fail http://localhost:8080/metrics || exit 1
 
 # Run the application
 CMD ["./main"]
