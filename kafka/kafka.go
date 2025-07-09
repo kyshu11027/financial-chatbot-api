@@ -23,20 +23,20 @@ var (
 
 func InitProducer() error {
 	username := os.Getenv("KAFKA_USERNAME")
-    password := os.Getenv("KAFKA_PASSWORD")
-	
+	password := os.Getenv("KAFKA_PASSWORD")
+
 	config := &kafka.ConfigMap{
 		"bootstrap.servers": os.Getenv("KAFKA_SERVER"),
 	}
 
-	 if username != "" && password != "" {
-        config.SetKey("security.protocol", "SASL_SSL")
-        config.SetKey("sasl.mechanisms", "PLAIN")
-        config.SetKey("sasl.username", username)
-        config.SetKey("sasl.password", password)
-    } else {
-        config.SetKey("security.protocol", "PLAINTEXT")
-    }
+	if username != "" && password != "" {
+		config.SetKey("security.protocol", "SASL_SSL")
+		config.SetKey("sasl.mechanisms", "PLAIN")
+		config.SetKey("sasl.username", username)
+		config.SetKey("sasl.password", password)
+	} else {
+		config.SetKey("security.protocol", "PLAINTEXT")
+	}
 
 	var err error
 	MessageProducer, err = kafka.NewProducer(config)
@@ -74,23 +74,23 @@ func ProduceMessage(topic string, message []byte) error {
 func StartKafkaConsumer() error {
 	// Get the Kafka username and password if they are set
 	username := os.Getenv("KAFKA_USERNAME")
-    password := os.Getenv("KAFKA_PASSWORD")
+	password := os.Getenv("KAFKA_PASSWORD")
 
 	// Get the number of partitions for the topic
 	adminConfig := &kafka.ConfigMap{
-        "bootstrap.servers": os.Getenv("KAFKA_SERVER"),
-    }
+		"bootstrap.servers": os.Getenv("KAFKA_SERVER"),
+	}
 
-    if username != "" && password != "" {
-        adminConfig.SetKey("security.protocol", "SASL_SSL")
-        adminConfig.SetKey("sasl.mechanisms", "PLAIN")
-        adminConfig.SetKey("sasl.username", username)
-        adminConfig.SetKey("sasl.password", password)
-    } else {
-        adminConfig.SetKey("security.protocol", "PLAINTEXT")
-    }
+	if username != "" && password != "" {
+		adminConfig.SetKey("security.protocol", "SASL_SSL")
+		adminConfig.SetKey("sasl.mechanisms", "PLAIN")
+		adminConfig.SetKey("sasl.username", username)
+		adminConfig.SetKey("sasl.password", password)
+	} else {
+		adminConfig.SetKey("security.protocol", "PLAINTEXT")
+	}
 
-    admin, err := kafka.NewAdminClient(adminConfig)
+	admin, err := kafka.NewAdminClient(adminConfig)
 	if err != nil {
 		logger.Get().Error("failed to create admin client", zap.Error(err))
 		return err
@@ -113,23 +113,23 @@ func StartKafkaConsumer() error {
 	WorkerPool.Start()
 
 	consumerConfig := &kafka.ConfigMap{
-        "bootstrap.servers": os.Getenv("KAFKA_SERVER"),
-        "session.timeout.ms": "45000",
-        "client.id":          "go-client-1",
-        "group.id":           GroupID,
-        "auto.offset.reset":  "latest",
-    }
+		"bootstrap.servers":  os.Getenv("KAFKA_SERVER"),
+		"session.timeout.ms": "45000",
+		"client.id":          "go-client-1",
+		"group.id":           GroupID,
+		"auto.offset.reset":  "latest",
+	}
 
-    if username != "" && password != "" {
-        consumerConfig.SetKey("security.protocol", "SASL_SSL")
-        consumerConfig.SetKey("sasl.mechanisms", "PLAIN")
-        consumerConfig.SetKey("sasl.username", username)
-        consumerConfig.SetKey("sasl.password", password)
-    } else {
-        consumerConfig.SetKey("security.protocol", "PLAINTEXT")
-    }
+	if username != "" && password != "" {
+		consumerConfig.SetKey("security.protocol", "SASL_SSL")
+		consumerConfig.SetKey("sasl.mechanisms", "PLAIN")
+		consumerConfig.SetKey("sasl.username", username)
+		consumerConfig.SetKey("sasl.password", password)
+	} else {
+		consumerConfig.SetKey("security.protocol", "PLAINTEXT")
+	}
 
-    consumer, err := kafka.NewConsumer(consumerConfig)
+	consumer, err := kafka.NewConsumer(consumerConfig)
 
 	if err != nil {
 		logger.Get().Error("failed to create consumer",

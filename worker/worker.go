@@ -22,16 +22,16 @@ type WorkerPool struct {
 
 	// Metrics
 	mu                 sync.RWMutex
-	messagesProcessed  int64
-	processingDuration int64
-	bufferFillLevels   []int64
-	messagesDropped    int64
+	messagesProcessed  uint64
+	processingDuration uint64
+	bufferFillLevels   []uint64
+	messagesDropped    uint64
 }
 
 func NewWorkerPool(workers int) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 	partitions := make([]chan []byte, workers)
-	bufferLevels := make([]int64, workers)
+	bufferLevels := make([]uint64, workers)
 	for i := range partitions {
 		partitions[i] = make(chan []byte, 100) // Buffer size of 100 per partition
 	}
@@ -46,7 +46,7 @@ func NewWorkerPool(workers int) *WorkerPool {
 
 func (wp *WorkerPool) Start() {
 	logger.Get().Info("Starting worker pool", zap.Int("workers", wp.workers))
-	for i := 0; i < wp.workers; i++ {
+	for i := range wp.partitions {
 		wp.wg.Add(1)
 		go wp.worker(i)
 	}
@@ -126,7 +126,7 @@ func (wp *WorkerPool) worker(id int) {
 
 			wp.mu.Lock()
 			wp.messagesProcessed++
-			wp.processingDuration += time.Since(startTime).Milliseconds()
+			wp.processingDuration += uint64(time.Since(startTime).Milliseconds())
 			wp.mu.Unlock()
 
 		case <-wp.ctx.Done():
@@ -142,9 +142,9 @@ func (wp *WorkerPool) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	wp.mu.RLock()
 	defer wp.mu.RUnlock()
 
-	var avgProcessingTime int64
+	var avgProcessingTime float64
 	if wp.messagesProcessed > 0 {
-		avgProcessingTime = wp.processingDuration / wp.messagesProcessed
+		avgProcessingTime = float64(wp.processingDuration / wp.messagesProcessed)
 	}
 
 	metrics := map[string]any{
