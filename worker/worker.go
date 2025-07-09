@@ -144,7 +144,7 @@ func (wp *WorkerPool) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var avgProcessingTime float64
 	if wp.messagesProcessed > 0 {
-		avgProcessingTime = float64(wp.processingDuration / wp.messagesProcessed)
+		avgProcessingTime = float64(wp.processingDuration) / float64(wp.messagesProcessed)
 	}
 
 	metrics := map[string]any{
