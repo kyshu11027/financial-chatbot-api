@@ -12,12 +12,13 @@ func CorsMiddleware(c *gin.Context) {
 	case strings.HasPrefix(c.Request.URL.Path, "/webhook"):
 		// Public webhook: allow any origin, no credentials
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	case strings.HasPrefix(c.Request.URL.Path, "/sse"):
-		// SSE endpoint — often public, allow any origin
-		c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_URL"))
 	default:
 		// Protected endpoints: restrict origin & allow credentials
-		c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_URL")) // or hardcode frontend URL
+		if os.Getenv("ENV") == "production" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_PROD_URL"))
+		} else {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("CLIENT_DEV_URL"))
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 	}
 

@@ -57,10 +57,17 @@ func HandleCreateStripeSession(c *gin.Context) {
 		return
 	}
 
+	var clientURL string
+	if os.Getenv("ENV") == "production" {
+		clientURL = os.Getenv("CLIENT_PROD_URL")
+	} else {
+		clientURL = os.Getenv("CLIENT_DEV_URL")
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		Customer:   stripe.String(cust.ID),
-		SuccessURL: stripe.String(string(os.Getenv("CLIENT_URL"))),
-		CancelURL:  stripe.String(string(os.Getenv("CLIENT_URL"))),
+		SuccessURL: stripe.String(clientURL),
+		CancelURL:  stripe.String(clientURL),
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{

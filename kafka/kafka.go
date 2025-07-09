@@ -22,18 +22,16 @@ var (
 )
 
 func InitProducer() error {
-	username := os.Getenv("KAFKA_USERNAME")
-	password := os.Getenv("KAFKA_PASSWORD")
 
 	config := &kafka.ConfigMap{
 		"bootstrap.servers": os.Getenv("KAFKA_SERVER"),
 	}
 
-	if username != "" && password != "" {
+	if os.Getenv("ENV") != "production" {
 		config.SetKey("security.protocol", "SASL_SSL")
 		config.SetKey("sasl.mechanisms", "PLAIN")
-		config.SetKey("sasl.username", username)
-		config.SetKey("sasl.password", password)
+		config.SetKey("sasl.username", os.Getenv("KAFKA_USERNAME"))
+		config.SetKey("sasl.password", os.Getenv("KAFKA_PASSWORD"))
 	} else {
 		config.SetKey("security.protocol", "PLAINTEXT")
 	}
