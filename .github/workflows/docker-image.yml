@@ -25,5 +25,5 @@ jobs:
         docker buildx build \
           --platform linux/amd64 \
           --tag kevin11027/financial-chatbot:api \
-          --tag kevin11027/financial-chatbot:api-${{ GITHUB_SHA::7}}
+          --tag kevin11027/financial-chatbot:api-${{GITHUB_SHA::7}} \
           --push .
